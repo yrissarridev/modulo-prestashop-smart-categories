@@ -251,6 +251,10 @@
                             <option value="not_in_categories" {if $cond.condition_type == 'not_in_categories'}selected{/if}>Excluir categorías</option>
                             <option value="in_feature_values" {if $cond.condition_type == 'in_feature_values'}selected{/if}>Tiene característica con valor</option>
                           </optgroup>
+                          <optgroup label="Ventas">
+                            <option value="no_sales_since_days" {if $cond.condition_type == 'no_sales_since_days'}selected{/if}>Sin ventas en los últimos X días</option>
+                            <option value="no_sales_ever"       {if $cond.condition_type == 'no_sales_ever'}selected{/if}>Nunca vendido</option>
+                          </optgroup>
                         </select>
                       </div>
                       <div class="sc-condition-values" id="scValues{$i}">
@@ -520,6 +524,15 @@ function scBuildValueHtml(type, val1, val2) {
   } else if (type === 'in_feature_values') {
     var ids = val1 ? val1.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
     return scBuildFeaturesCheckboxes(ids);
+  } else if (type === 'no_sales_since_days') {
+    return '<div class="sc-form-group"><label class="sc-label">D\u00edas sin ventas</label>'
+      + '<input type="number" name="condition_value[]" class="sc-input sc-input-sm" min="1" step="1" placeholder="Ej: 90, 180, 365, 730" value="' + val1 + '">'
+      + '<input type="hidden" name="condition_value2[]" value="">'
+      + '<p class="sc-no-value-note">Incluye productos nunca vendidos.</p></div>';
+  } else if (type === 'no_sales_ever') {
+    return '<input type="hidden" name="condition_value[]" value="1">'
+      + '<input type="hidden" name="condition_value2[]" value="">'
+      + '<p class="sc-no-value-note">No requiere valor adicional</p>';
   }
   return '<input type="hidden" name="condition_value[]" value=""><input type="hidden" name="condition_value2[]" value="">';
 }
@@ -547,6 +560,10 @@ function scConditionTypeOptions(selected) {
     + '<option value="in_categories"' + (selected==='in_categories'?' selected':'') + '>Pertenece a categor\u00edas</option>'
     + '<option value="not_in_categories"' + (selected==='not_in_categories'?' selected':'') + '>Excluir categor\u00edas</option>'
     + '<option value="in_feature_values"' + (selected==='in_feature_values'?' selected':'') + '>Tiene caracter\u00edstica con valor</option>'
+    + '</optgroup>'
+    + '<optgroup label="Ventas">'
+    + '<option value="no_sales_since_days"' + (selected==='no_sales_since_days'?' selected':'') + '>Sin ventas en los \u00faltimos X d\u00edas</option>'
+    + '<option value="no_sales_ever"' + (selected==='no_sales_ever'?' selected':'') + '>Nunca vendido</option>'
     + '</optgroup>';
   return opts;
 }

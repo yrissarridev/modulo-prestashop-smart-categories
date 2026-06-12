@@ -397,6 +397,24 @@ class SmartCategoryRule extends ObjectModel
                             . ' ON (' . $alias . '.id_product = p.id_product AND ' . $alias . '.id_feature_value IN (' . $inList . '))';
                     }
                     break;
+
+                case 'no_sales_since_days':
+                    $days = (int) $condition['value'];
+                    $conditionWheres[] = 'p.id_product NOT IN (
+                        SELECT od.product_id
+                        FROM `' . _DB_PREFIX_ . 'order_detail` od
+                        INNER JOIN `' . _DB_PREFIX_ . 'orders` o ON (o.id_order = od.id_order)
+                        WHERE o.date_add >= DATE_SUB(NOW(), INTERVAL ' . $days . ' DAY)
+                    )';
+                    break;
+
+                case 'no_sales_ever':
+                    $conditionWheres[] = 'p.id_product NOT IN (
+                        SELECT od.product_id
+                        FROM `' . _DB_PREFIX_ . 'order_detail` od
+                        INNER JOIN `' . _DB_PREFIX_ . 'orders` o ON (o.id_order = od.id_order)
+                    )';
+                    break;
             }
         }
 

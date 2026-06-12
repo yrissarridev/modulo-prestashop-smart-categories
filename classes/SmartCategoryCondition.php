@@ -61,12 +61,21 @@ class SmartCategoryCondition extends ObjectModel
                     'stock_equal'   => 'Stock igual a X',
                 ],
             ],
+            'sales' => [
+                'label' => 'Ventas',
+                'types' => [
+                    'no_sales_since_days' => 'Sin ventas en los últimos X días',
+                    'no_sales_ever'       => 'Nunca vendido',
+                ],
+            ],
             'catalog' => [
                 'label' => 'Catálogo',
                 'types' => [
                     'in_categories'     => 'Pertenece a categorías (cualquiera)',
                     'not_in_categories' => 'Excluir categorías (ninguna de estas)',
                     'in_feature_values' => 'Tiene característica con valor',
+            'no_sales_since_days'  => 'Sin ventas en X días',
+            'no_sales_ever'        => 'Nunca vendido',
                 ],
             ],
         ];
@@ -111,6 +120,8 @@ class SmartCategoryCondition extends ObjectModel
             'in_categories'      => 'Pertenece a categorías',
             'not_in_categories'  => 'Excluir categorías',
             'in_feature_values'  => 'Tiene característica con valor',
+            'no_sales_since_days'  => 'Sin ventas en X días',
+            'no_sales_ever'        => 'Nunca vendido',
         ];
 
         return isset($labels[$type]) ? $labels[$type] : $type;
@@ -151,6 +162,10 @@ class SmartCategoryCondition extends ObjectModel
             case 'in_feature_values':
                 $ids = array_filter(explode(',', $condition['value']));
                 return 'Tiene ' . count($ids) . ' valor(es) de característica seleccionado(s)';
+            case 'no_sales_since_days':
+                return 'Sin ventas en los últimos ' . $condition['value'] . ' días';
+            case 'no_sales_ever':
+                return 'Nunca ha tenido ventas';
             default:
                 return $condition['condition_type'];
         }
