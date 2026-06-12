@@ -1,0 +1,35 @@
+/* SmartCategories — badge personalizado, compatible con Classic theme */
+
+/* Badge en listado: 100% ancho, en línea propia debajo de los otros flags */
+ul.product-flags:has(.sc-custom-flag),
+.product-flags:has(.sc-custom-flag) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+li.product-flag.sc-custom-flag {
+  width: 100%;
+  display: block;
+  text-align: center;
+  font-size: .6875rem;
+  font-weight: 700;
+  padding: .3125rem .4375rem;
+  text-transform: uppercase;
+  line-height: 1;
+  /* background-color y color se aplican inline desde PHP/JS */
+}
+
+/* Badge en ficha de producto: también 100% ancho */
+.product-prices .sc-custom-flag,
+.product-information .sc-custom-flag {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-size: .8rem;
+  font-weight: 700;
+  padding: .4rem .6rem;
+  text-transform: uppercase;
+  margin-bottom: .5rem;
+  list-style: none;
+}
