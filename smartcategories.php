@@ -532,4 +532,51 @@ HTML;
         }
         return $results;
     }
+    /**
+     * Hook admin — aviso de nueva versión disponible
+     */
+    public function hookActionAdminControllerSetMedia()
+    {
+        if (Tools::getValue('configure') !== $this->name) {
+            return;
+        }
+
+        $remoteVersion = $this->getRemoteVersion();
+        if ($remoteVersion && version_compare($remoteVersion, $this->version, '>')) {
+            $this->context->controller->warnings[] =
+                $this->l('Nueva versión disponible') . ': <strong>v' . $remoteVersion . '</strong> — '
+                . '<a href="https://github.com/yrissarridev/modulo-prestashop-smart-categories" target="_blank">Ver en GitHub</a>';
+        }
+    }
+
+    /**
+     * Obtener versión remota desde GitHub (cacheada 24h)
+     */
+    private function getRemoteVersion()
+    {
+        $cacheKey = 'SC_REMOTE_VERSION';
+        $cached   = Configuration::get($cacheKey);
+        $cachedAt = (int) Configuration::get($cacheKey . '_TS');
+
+        if ($cached && (time() - $cachedAt) < 86400) {
+            return $cached;
+        }
+
+        $url  = 'https://raw.githubusercontent.com/yrissarridev/modulo-prestashop-smart-categories/main/version.json';
+        $json = @file_get_contents($url);
+        if (!$json) {
+            return false;
+        }
+
+        $data = json_decode($json, true);
+        if (empty($data['version'])) {
+            return false;
+        }
+
+        Configuration::updateValue($cacheKey, $data['version']);
+        Configuration::updateValue($cacheKey . '_TS', time());
+
+        return $data['version'];
+    }
+
 }
