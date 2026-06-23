@@ -46,8 +46,7 @@
             <div class="sc-form-group">
               <label class="sc-label" for="ruleCategory">Categoría destino *</label>
               <div class="sc-select-with-action">
-                <input type="text" id="sc-category-search" class="form-control" placeholder="Buscar categoría por nombre o ID..." style="margin-bottom:8px;">
-<select id="ruleCategory" name="id_category" class="sc-select" required class="sc-select2-category">
+                <select id="ruleCategory" name="id_category" class="sc-select" required>
                   <option value="">— Seleccionar categoría —</option>
                   {foreach $category_list as $catId => $catName}
                     <option value="{$catId}" {if $rule && $rule->id_rule && $rule->id_category == $catId}selected{/if}>

@@ -120,10 +120,6 @@
                      class="sc-btn-icon" title="Editar">
                     ✏
                   </a>
-<a href="{$base_url}&action=duplicate&id_rule={$rule.id_rule}"
-                     class="sc-btn-icon" title="Duplicar">
-                    ⧉
-                  </a>
                   <a href="{$base_url}&action=logs&id_rule={$rule.id_rule}"
                      class="sc-btn-icon" title="Ver logs">
                     📊

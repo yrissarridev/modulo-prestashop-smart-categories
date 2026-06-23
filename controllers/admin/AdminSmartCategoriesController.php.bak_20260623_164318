@@ -36,8 +36,6 @@ class AdminSmartCategoriesController extends ModuleAdminController
     public function initContent()
     {
         $this->addCSS($this->module->getPathUri() . 'views/css/admin.css');
-        $this->addJS($this->module->getPathUri() . 'views/js/admin-category-search.js');
-        $this->addJS($this->module->getPathUri() . 'views/js/admin-select2.js');
 
         // Registrar hooks necesarios si no están aún (para módulos instalados antes de esta versión)
         foreach (['displayHeader', 'actionFrontControllerSetMedia'] as $hookName) {
@@ -59,9 +57,6 @@ class AdminSmartCategoriesController extends ModuleAdminController
                 break;
             case 'delete':
                 $this->scDelete();
-                break;
-            case 'duplicate':
-                $this->scDuplicate();
                 break;
             case 'toggle':
                 $this->scToggle();
@@ -178,7 +173,13 @@ class AdminSmartCategoriesController extends ModuleAdminController
             }
             $conditions = SmartCategoryCondition::getConditionsByRule($idRule);
         }
-        $categoryList = $this->scGetTargetCategoryOptions();
+
+        $categories   = Category::getCategories($this->context->language->id, false, false);
+        $categoryList = [];
+        foreach ($categories as $cat) {
+            $categoryList[(int) $cat['id_category']] =
+                str_repeat('— ', max(0, (int) $cat['level_depth'] - 1)) . $cat['name'];
+        }
 
         $adminLink = $this->context->link->getAdminLink('AdminSmartCategories');
 
@@ -385,69 +386,6 @@ class AdminSmartCategoriesController extends ModuleAdminController
         }
     }
 
-
-    public function scDuplicate()
-    {
-        $idRule = (int) Tools::getValue('id_rule', 0);
-
-        if (!$idRule) {
-            Tools::redirectAdmin($this->context->link->getAdminLink('AdminSmartCategories') . '&sc_err=' . urlencode($this->l('Regla no válida.')));
-        }
-
-        $db = Db::getInstance();
-
-        $source = $db->getRow(
-            'SELECT * FROM `' . _DB_PREFIX_ . 'smartcategory_rules` WHERE id_rule = ' . (int) $idRule
-        );
-
-        if (!$source) {
-            Tools::redirectAdmin($this->context->link->getAdminLink('AdminSmartCategories') . '&sc_err=' . urlencode($this->l('No se encontró la regla original.')));
-        }
-
-        unset($source['id_rule']);
-
-        $source['name'] = $source['name'] . ' (Copia)';
-        $source['active'] = 0;
-        $source['date_add'] = date('Y-m-d H:i:s');
-        $source['date_upd'] = date('Y-m-d H:i:s');
-
-        if (isset($source['last_execution'])) {
-            $source['last_execution'] = null;
-        }
-
-        foreach ($source as $key => $value) {
-            if ($value !== null) {
-                $source[$key] = pSQL($value);
-            }
-        }
-
-        if (!$db->insert('smartcategory_rules', $source)) {
-            Tools::redirectAdmin($this->context->link->getAdminLink('AdminSmartCategories') . '&sc_err=' . urlencode($this->l('No se pudo duplicar la regla.')));
-        }
-
-        $newIdRule = (int) $db->Insert_ID();
-
-        $conditions = SmartCategoryCondition::getConditionsByRule($idRule);
-
-        foreach ($conditions as $condition) {
-            $db->insert('smartcategory_conditions', [
-                'id_rule'        => (int) $newIdRule,
-                'condition_type' => pSQL($condition['condition_type']),
-                'operator'       => pSQL($condition['operator']),
-                'value'          => pSQL($condition['value']),
-                'value2'         => pSQL($condition['value2']),
-                'sort_order'     => (int) $condition['sort_order'],
-            ]);
-        }
-
-        Tools::redirectAdmin(
-            $this->context->link->getAdminLink('AdminSmartCategories')
-            . '&action=edit&id_rule=' . (int) $newIdRule
-            . '&sc_msg=' . urlencode($this->l('Regla duplicada correctamente. La copia está inactiva.'))
-        );
-    }
-
-
     public function scDelete()
     {
         $idRule = (int) Tools::getValue('id_rule', 0);
@@ -571,65 +509,6 @@ class AdminSmartCategoriesController extends ModuleAdminController
      * Garantiza que todas las columnas necesarias existen en BD.
      * Se llama antes de cada guardado para instalaciones que vienen de versiones anteriores.
      */
-
-    private function scGetTargetCategoryOptions()
-    {
-        $idLang = (int) $this->context->language->id;
-        $idShop = (int) $this->context->shop->id;
-
-        $rows = Db::getInstance()->executeS(
-            'SELECT c.id_category, c.id_parent, c.active, c.nleft, c.level_depth, cl.name
-             FROM `' . _DB_PREFIX_ . 'category` c
-             INNER JOIN `' . _DB_PREFIX_ . 'category_lang` cl
-                ON (cl.id_category = c.id_category AND cl.id_lang = ' . $idLang . ' AND cl.id_shop = ' . $idShop . ')
-             INNER JOIN `' . _DB_PREFIX_ . 'category_shop` cs
-                ON (cs.id_category = c.id_category AND cs.id_shop = ' . $idShop . ')
-             WHERE c.id_category > 1
-             ORDER BY c.nleft ASC'
-        ) ?: [];
-
-        $names = [];
-        foreach ($rows as $row) {
-            $names[(int) $row['id_category']] = $row['name'];
-        }
-
-        $result = [];
-        foreach ($rows as $row) {
-            $idCategory = (int) $row['id_category'];
-            $path = [];
-
-            $current = $row;
-            $guard = 0;
-
-            while ($current && $guard < 20) {
-                array_unshift($path, $current['name']);
-                $parentId = (int) $current['id_parent'];
-
-                if ($parentId <= 1 || !isset($names[$parentId])) {
-                    break;
-                }
-
-                $current = null;
-                foreach ($rows as $candidate) {
-                    if ((int) $candidate['id_category'] === $parentId) {
-                        $current = $candidate;
-                        break;
-                    }
-                }
-
-                $guard++;
-            }
-
-            $status = ((int) $row['active'] === 1) ? 'Activa' : 'Inactiva';
-            $label = '[' . $idCategory . '] ' . implode(' > ', $path) . ' · ' . $status;
-
-            $result[$idCategory] = $label;
-        }
-
-        return $result;
-    }
-
-
     private function scEnsureColumns()
     {
         $db     = Db::getInstance();
