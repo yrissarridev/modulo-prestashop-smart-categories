@@ -2,7 +2,7 @@
 /**
  * SmartCategories - Módulo de categorización automática para PrestaShop
  * @author Luis de Yrissarri
- * @version 1.1.8
+ * @version 1.2.0
  * Compatible con PrestaShop 1.7.5 - 9.x
  */
 
@@ -19,7 +19,7 @@ class SmartCategories extends Module
     {
         $this->name = 'smartcategories';
         $this->tab = 'administration';
-        $this->version = '1.1.8';
+        $this->version = '1.2.0';
         $this->author = 'Luis de Yrissarri';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = [
