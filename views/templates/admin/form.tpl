@@ -251,6 +251,10 @@
                             <option value="not_in_categories" {if $cond.condition_type == 'not_in_categories'}selected{/if}>Excluir categorías</option>
                             <option value="in_feature_values" {if $cond.condition_type == 'in_feature_values'}selected{/if}>Tiene característica con valor</option>
                           </optgroup>
+                          <optgroup label="Marca">
+                            <option value="in_manufacturers"     {if $cond.condition_type == 'in_manufacturers'}selected{/if}>Pertenece a marca(s)</option>
+                            <option value="not_in_manufacturers" {if $cond.condition_type == 'not_in_manufacturers'}selected{/if}>Excluir marca(s)</option>
+                          </optgroup>
                           <optgroup label="Ventas">
                             <option value="no_sales_since_days" {if $cond.condition_type == 'no_sales_since_days'}selected{/if}>Sin ventas en los últimos X días</option>
                             <option value="no_sales_ever"       {if $cond.condition_type == 'no_sales_ever'}selected{/if}>Nunca vendido</option>
@@ -297,6 +301,8 @@
               <li><strong>Stock</strong>: Unidades disponibles</li>
               <li><strong>Categorías</strong>: Producto pertenece a cualquiera de las categorías seleccionadas</li>
               <li><strong>Características</strong>: Producto tiene alguno de los valores de característica seleccionados</li>
+              <li><strong>Marca</strong>: Producto pertenece (o no) a alguna de las marcas seleccionadas</li>
+              <li><strong>Ventas</strong>: Sin ventas en X días, o nunca vendido</li>
             </ul>
             <h4>Opción noindex</h4>
             <p>Marca la categoría destino como <strong>noindex</strong> cada vez que se ejecuta la regla, para que los buscadores no la indexen.</p>
@@ -358,6 +364,7 @@
 var scCreateCatUrl      = '{$create_cat_url}';
 var scFilterCategories  = {$filter_categories|json_encode};
 var scFilterFeatures    = {$filter_features|json_encode};
+var scFilterManufacturers = {$filter_manufacturers|json_encode};
 var scExistingConditions = {$conditions|json_encode};
 var scConditionIndex     = {$conditions|count};
 </script>
@@ -438,6 +445,25 @@ function scBuildFeaturesCheckboxes(selectedIds) {
         + '<input type="checkbox" value="' + val.id + '" ' + checked + ' onchange="scSyncMultiHidden(this)">'
         + '<span>' + val.name + '</span></label>';
     });
+  });
+  html += '</div></div>';
+  return html;
+}
+
+function scBuildManufacturersCheckboxes(selectedIds, exclude) {
+  selectedIds = selectedIds || [];
+  var label = exclude ? 'Excluir marca(s) (puede seleccionar varias)' : 'Marca(s) (puede seleccionar varias)';
+  var html = '<div class="sc-form-group">'
+    + '<label class="sc-label">' + label + '</label>'
+    + '<input type="hidden" name="condition_value[]" class="sc-multisel-hidden" value="' + selectedIds.join(',') + '">'
+    + '<input type="hidden" name="condition_value2[]" value="">'
+    + '<div class="sc-multicheck-search"><input type="text" class="sc-input sc-input-sm sc-multicheck-filter" placeholder="Buscar marca..." oninput="scFilterCheckboxes(this)"></div>'
+    + '<div class="sc-multicheck-list">';
+  scFilterManufacturers.forEach(function(brand) {
+    var checked = selectedIds.indexOf(String(brand.id)) !== -1 || selectedIds.indexOf(brand.id) !== -1 ? 'checked' : '';
+    html += '<label class="sc-check-item">'
+      + '<input type="checkbox" value="' + brand.id + '" ' + checked + ' onchange="scSyncMultiHidden(this)">'
+      + '<span>' + brand.name + '</span></label>';
   });
   html += '</div></div>';
   return html;
@@ -524,6 +550,12 @@ function scBuildValueHtml(type, val1, val2) {
   } else if (type === 'in_feature_values') {
     var ids = val1 ? val1.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
     return scBuildFeaturesCheckboxes(ids);
+  } else if (type === 'in_manufacturers') {
+    var ids = val1 ? val1.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
+    return scBuildManufacturersCheckboxes(ids, false);
+  } else if (type === 'not_in_manufacturers') {
+    var ids = val1 ? val1.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
+    return scBuildManufacturersCheckboxes(ids, true);
   } else if (type === 'no_sales_since_days') {
     return '<div class="sc-form-group"><label class="sc-label">D\u00edas sin ventas</label>'
       + '<input type="number" name="condition_value[]" class="sc-input sc-input-sm" min="1" step="1" placeholder="Ej: 90, 180, 365, 730" value="' + val1 + '">'
@@ -560,6 +592,10 @@ function scConditionTypeOptions(selected) {
     + '<option value="in_categories"' + (selected==='in_categories'?' selected':'') + '>Pertenece a categor\u00edas</option>'
     + '<option value="not_in_categories"' + (selected==='not_in_categories'?' selected':'') + '>Excluir categor\u00edas</option>'
     + '<option value="in_feature_values"' + (selected==='in_feature_values'?' selected':'') + '>Tiene caracter\u00edstica con valor</option>'
+    + '</optgroup>'
+    + '<optgroup label="Marca">'
+    + '<option value="in_manufacturers"' + (selected==='in_manufacturers'?' selected':'') + '>Pertenece a marca(s)</option>'
+    + '<option value="not_in_manufacturers"' + (selected==='not_in_manufacturers'?' selected':'') + '>Excluir marca(s)</option>'
     + '</optgroup>'
     + '<optgroup label="Ventas">'
     + '<option value="no_sales_since_days"' + (selected==='no_sales_since_days'?' selected':'') + '>Sin ventas en los \u00faltimos X d\u00edas</option>'

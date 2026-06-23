@@ -184,18 +184,19 @@ class AdminSmartCategoriesController extends ModuleAdminController
         $adminLink = $this->context->link->getAdminLink('AdminSmartCategories');
 
         $this->context->smarty->assign([
-            'rule'              => $rule,
-            'conditions'        => $conditions,
-            'category_list'     => $categoryList,
-            'base_url'          => $adminLink,
-            'save_url'          => $adminLink . '&action=save',
-            'create_cat_url'    => $adminLink . '&action=create_category',
-            'confirmations'     => $this->confirmations,
-            'errors'            => $this->errors,
-            'filter_categories' => SmartCategoryRule::getCategoriesForCondition(),
-            'filter_features'   => SmartCategoryRule::getFeaturesForCondition(),
-            'start_date_input'  => ($rule && !empty($rule->start_date)) ? SmartCategoryRule::formatDatetimeForInput($rule->start_date) : '',
-            'end_date_input'    => ($rule && !empty($rule->end_date)) ? SmartCategoryRule::formatDatetimeForInput($rule->end_date) : '',
+            'rule'                 => $rule,
+            'conditions'           => $conditions,
+            'category_list'        => $categoryList,
+            'base_url'             => $adminLink,
+            'save_url'             => $adminLink . '&action=save',
+            'create_cat_url'       => $adminLink . '&action=create_category',
+            'confirmations'        => $this->confirmations,
+            'errors'               => $this->errors,
+            'filter_categories'    => SmartCategoryRule::getCategoriesForCondition(),
+            'filter_features'      => SmartCategoryRule::getFeaturesForCondition(),
+            'filter_manufacturers' => SmartCategoryRule::getManufacturersForCondition(),
+            'start_date_input'     => ($rule && !empty($rule->start_date)) ? SmartCategoryRule::formatDatetimeForInput($rule->start_date) : '',
+            'end_date_input'       => ($rule && !empty($rule->end_date)) ? SmartCategoryRule::formatDatetimeForInput($rule->end_date) : '',
         ]);
 
         $this->content = $this->context->smarty->fetch(

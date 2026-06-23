@@ -398,22 +398,6 @@ class SmartCategoryRule extends ObjectModel
                     }
                     break;
 
-                case 'in_manufacturers':
-                    $ids = array_map('intval', array_filter(explode(',', $condition['value'])));
-                    if (!empty($ids)) {
-                        $inList = implode(',', $ids);
-                        $conditionWheres[] = 'p.id_manufacturer IN (' . $inList . ')';
-                    }
-                    break;
-
-                case 'not_in_manufacturers':
-                    $ids = array_map('intval', array_filter(explode(',', $condition['value'])));
-                    if (!empty($ids)) {
-                        $inList = implode(',', $ids);
-                        $conditionWheres[] = '(p.id_manufacturer IS NULL OR p.id_manufacturer NOT IN (' . $inList . '))';
-                    }
-                    break;
-
                 case 'no_sales_since_days':
                     $days = (int) $condition['value'];
                     $conditionWheres[] = 'p.id_product NOT IN (
@@ -750,32 +734,6 @@ class SmartCategoryRule extends ObjectModel
             ];
         }
         return array_values($grouped);
-    }
-
-    /**
-     * Obtener marcas/fabricantes para el selector de condiciones.
-     * Devuelve: [ ['id' => X, 'name' => 'Marca'], ... ]
-     */
-    public static function getManufacturersForCondition()
-    {
-        $idLang = (int) Context::getContext()->language->id;
-
-        $rows = Db::getInstance()->executeS(
-            'SELECT m.id_manufacturer, m.name
-             FROM `' . _DB_PREFIX_ . 'manufacturer` m
-             WHERE m.active = 1
-             ORDER BY m.name ASC'
-        ) ?: [];
-
-        $result = [];
-        foreach ($rows as $row) {
-            $result[] = [
-                'id' => (int) $row['id_manufacturer'],
-                'name' => $row['name'],
-            ];
-        }
-
-        return $result;
     }
 
     public function getScheduleStatusLabel()
