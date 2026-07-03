@@ -635,6 +635,13 @@ class AdminSmartCategoriesController extends ModuleAdminController
         $db     = Db::getInstance();
         $prefix = _DB_PREFIX_;
 
+        // Comprobar si active existe
+        $cols = $db->executeS("SHOW COLUMNS FROM \`" . $prefix . "smartcategory_rules\` LIKE 'active'");
+        if (empty($cols)) {
+            $db->execute("ALTER TABLE \`" . $prefix . "smartcategory_rules\` ADD COLUMN \`active\` TINYINT(1) NOT NULL DEFAULT 1 AFTER id_category");
+            $this->scLog("scEnsureColumns: active column created");
+        }
+
         // Comprobar si flag_text existe
         $cols = $db->executeS('SHOW COLUMNS FROM `' . $prefix . 'smartcategory_rules` LIKE \'flag_text\'');
         if (empty($cols)) {
