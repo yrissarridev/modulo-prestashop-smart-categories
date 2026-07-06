@@ -1,0 +1,2 @@
+version.json export-ignore
+*.bak_* export-ignore
