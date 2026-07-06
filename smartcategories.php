@@ -533,7 +533,7 @@ HTML;
         return $results;
     }
     /**
-     * Hook admin — aviso de nueva versión disponible
+     * Hook admin — aviso de nueva versión disponible o diagnostico si no se pudo comprobar
      */
     public function hookActionAdminControllerSetMedia()
     {
@@ -542,15 +542,26 @@ HTML;
         }
 
         $remoteVersion = $this->getRemoteVersion();
+
         if ($remoteVersion && version_compare($remoteVersion, $this->version, '>')) {
             $this->context->controller->warnings[] =
                 $this->l('Nueva versión disponible') . ': <strong>v' . $remoteVersion . '</strong> — '
                 . '<a href="https://github.com/yrissarridev/modulo-prestashop-smart-categories" target="_blank">Ver en GitHub</a>';
+            return;
+        }
+
+        $lastError = Configuration::get('SC_REMOTE_VERSION_ERROR');
+        if (!$remoteVersion && $lastError) {
+            $this->context->controller->warnings[] =
+                $this->l('No se pudo comprobar si hay una version nueva') . ': <code>'
+                . htmlspecialchars($lastError, ENT_QUOTES, 'UTF-8') . '</code> — '
+                . $this->l('esto no afecta al funcionamiento del modulo, solo al aviso de actualizacion.');
         }
     }
 
     /**
-     * Obtener versión remota desde GitHub (cacheada 24h)
+     * Obtener versión remota desde GitHub (cacheada 24h). Guarda el error real si falla,
+     * en vez de tragarselo en silencio, para poder verlo desde el panel sin SSH.
      */
     private function getRemoteVersion()
     {
@@ -562,21 +573,74 @@ HTML;
             return $cached;
         }
 
-        $url  = 'https://raw.githubusercontent.com/yrissarridev/modulo-prestashop-smart-categories/main/version.json';
-        $json = @file_get_contents($url);
-        if (!$json) {
+        $url = 'https://raw.githubusercontent.com/yrissarridev/modulo-prestashop-smart-categories/main/version.json';
+        list($json, $error) = $this->fetchRemoteVersionJson($url);
+
+        if ($json === false) {
+            Configuration::updateValue('SC_REMOTE_VERSION_ERROR', $error);
+            Configuration::updateValue($cacheKey . '_TS', time());
             return false;
         }
 
         $data = json_decode($json, true);
         if (empty($data['version'])) {
+            Configuration::updateValue('SC_REMOTE_VERSION_ERROR', 'JSON invalido o sin campo version: ' . substr($json, 0, 200));
+            Configuration::updateValue($cacheKey . '_TS', time());
             return false;
         }
 
         Configuration::updateValue($cacheKey, $data['version']);
         Configuration::updateValue($cacheKey . '_TS', time());
+        Configuration::updateValue('SC_REMOTE_VERSION_ERROR', '');
 
         return $data['version'];
+    }
+
+    /**
+     * Intenta file_get_contents primero, y si falla (allow_url_fopen desactivado,
+     * timeout, TLS, etc.) usa cURL como respaldo si esta disponible.
+     * Devuelve [contenido_o_false, mensaje_de_error_o_vacio]
+     */
+    private function fetchRemoteVersionJson($url)
+    {
+        if (ini_get('allow_url_fopen')) {
+            $context = stream_context_create([
+                'http' => ['timeout' => 5, 'ignore_errors' => true],
+                'ssl'  => ['verify_peer' => true, 'verify_peer_name' => true],
+            ]);
+            $json = @file_get_contents($url, false, $context);
+            if ($json !== false && $json !== '') {
+                return [$json, ''];
+            }
+            $lastErr = error_get_last();
+            $fgcError = $lastErr ? $lastErr['message'] : 'file_get_contents fallo sin detalle';
+        } else {
+            $fgcError = 'allow_url_fopen esta desactivado en este servidor';
+        }
+
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 5,
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_USERAGENT      => 'SmartCategories-VersionCheck',
+            ]);
+            $json = curl_exec($ch);
+            $curlErrno = curl_errno($ch);
+            $curlError = curl_error($ch);
+            $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($json !== false && $json !== '' && $httpCode === 200) {
+                return [$json, ''];
+            }
+
+            return [false, 'file_get_contents: ' . $fgcError . ' | cURL error ' . $curlErrno . ': ' . $curlError . ' (HTTP ' . $httpCode . ')'];
+        }
+
+        return [false, 'file_get_contents: ' . $fgcError . ' | cURL no disponible en este servidor'];
     }
 
 }
