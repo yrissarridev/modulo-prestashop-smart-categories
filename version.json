@@ -1,4 +1,4 @@
 {
-  "version": "1.2.4",
-  "changelog": "Fix: las reglas programadas ya no vacian categorias compartidas antes de tiempo; el vaciado por regla inactiva/finalizada ahora respeta si otra regla vigente comparte la misma categoria destino."
+  "version": "1.2.5",
+  "changelog": "Chequeo de version remota mas robusto: fallback a cURL si file_get_contents falla, y aviso visible en el panel con el motivo exacto si no se puede comprobar."
 }

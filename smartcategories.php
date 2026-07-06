@@ -19,7 +19,7 @@ class SmartCategories extends Module
     {
         $this->name = 'smartcategories';
         $this->tab = 'administration';
-        $this->version = '1.2.4';
+        $this->version = '1.2.5';
         $this->author = 'Luis de Yrissarri';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = [
