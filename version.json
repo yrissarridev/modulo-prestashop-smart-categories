@@ -1,4 +1,4 @@
 {
-  "version": "1.2.3",
-  "changelog": "Fix: columna 'active' faltante en smartcategory_rules causaba error al guardar reglas en instalaciones antiguas."
+  "version": "1.2.4",
+  "changelog": "Fix: las reglas programadas ya no vacian categorias compartidas antes de tiempo; el vaciado por regla inactiva/finalizada ahora respeta si otra regla vigente comparte la misma categoria destino."
 }

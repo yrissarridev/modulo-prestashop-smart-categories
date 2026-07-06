@@ -210,14 +210,17 @@ class SmartCategoryRule extends ObjectModel
     }
 
     /**
-     * Comprueba si otra regla que comparte la misma categoria destino esta vigente ahora mismo
-     * (activa y dentro de su rango de fechas, o sin fechas definidas).
+     * Comprueba si otra regla que comparte la misma categoría destino está vigente ahora mismo.
+     * Evita que una regla no vigente (inactiva/programada/finalizada) borre lo que otra regla
+     * vigente acaba de dejar en la categoría compartida.
      */
     private function hasVigenteSiblingSharingCategory()
     {
         $rows = Db::getInstance()->executeS(
-            'SELECT active, start_date, end_date FROM `' . _DB_PREFIX_ . 'smartcategory_rules` '
-            . 'WHERE id_category = ' . (int) $this->id_category . ' AND id_rule != ' . (int) $this->id_rule
+            "SELECT active, start_date, end_date
+             FROM \`" . _DB_PREFIX_ . "smartcategory_rules\`
+             WHERE id_category = " . (int) $this->id_category . "
+               AND id_rule != " . (int) $this->id_rule
         );
 
         if (!$rows) {
@@ -225,17 +228,17 @@ class SmartCategoryRule extends ObjectModel
         }
 
         foreach ($rows as $row) {
-            if (!(int) $row['active']) {
+            if (!(int) $row["active"]) {
                 continue;
             }
 
-            $hasStart = !empty($row['start_date']) && $row['start_date'] !== '0000-00-00 00:00:00' && strtotime($row['start_date']) > 0;
-            $hasEnd   = !empty($row['end_date'])   && $row['end_date']   !== '0000-00-00 00:00:00' && strtotime($row['end_date'])   > 0;
+            $hasStart = !empty($row["start_date"]) && $row["start_date"] !== "0000-00-00 00:00:00" && strtotime($row["start_date"]) > 0;
+            $hasEnd   = !empty($row["end_date"])   && $row["end_date"]   !== "0000-00-00 00:00:00" && strtotime($row["end_date"])   > 0;
 
-            if ($hasStart && strtotime($row['start_date']) > time()) {
+            if ($hasStart && strtotime($row["start_date"]) > time()) {
                 continue;
             }
-            if ($hasEnd && strtotime($row['end_date']) < time()) {
+            if ($hasEnd && strtotime($row["end_date"]) < time()) {
                 continue;
             }
 
@@ -243,18 +246,6 @@ class SmartCategoryRule extends ObjectModel
         }
 
         return false;
-    }
-
-    /**
-     * Vacia y desactiva la categoria solo si ninguna otra regla vigente la comparte.
-     * Si otra regla vigente la comparte, no se toca nada (esa regla ya la gestiona).
-     */
-    private function clearCategoryUnlessSiblingActive($message)
-    {
-        if ($this->hasVigenteSiblingSharingCategory()) {
-            return $this->logResult(0, 0, 0, 'success', $message . ' (Categoria compartida con otra regla vigente: no se toca.)');
-        }
-        return $this->clearCategoryAndDisable($message);
     }
 
     /**
@@ -268,15 +259,24 @@ class SmartCategoryRule extends ObjectModel
 
         try {
             if (!(int) $this->active) {
-                return $this->clearCategoryUnlessSiblingActive('Regla inactiva: categoria vaciada y desactivada.');
+                if ($this->hasVigenteSiblingSharingCategory()) {
+                    return $this->logResult(0, 0, microtime(true) - $startTime, "success", "Regla inactiva: categoría compartida con otra regla vigente, no se toca.");
+                }
+                return $this->clearCategoryBecauseInactive();
             }
 
             if ($this->isScheduledForFuture()) {
-                return $this->logResult(0, 0, microtime(true) - $startTime, 'success', 'Campana programada: todavia no ha empezado, no se realiza ninguna accion.');
+                if ($this->hasVigenteSiblingSharingCategory()) {
+                    return $this->logResult(0, 0, microtime(true) - $startTime, "success", "Campaña programada: categoría compartida con otra regla vigente, no se toca.");
+                }
+                return $this->clearCategoryBecauseScheduled();
             }
 
             if ($this->isFinishedBySchedule()) {
-                return $this->clearCategoryUnlessSiblingActive('Campana finalizada: categoria vaciada y desactivada automaticamente.');
+                if ($this->hasVigenteSiblingSharingCategory()) {
+                    return $this->logResult(0, 0, microtime(true) - $startTime, "success", "Campaña finalizada: categoría compartida con otra regla vigente, no se toca.");
+                }
+                return $this->clearCategoryBecauseFinished();
             }
 
             $this->setCategoryActive(true);

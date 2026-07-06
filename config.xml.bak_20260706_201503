@@ -2,7 +2,7 @@
 <module>
     <name>smartcategories</name>
     <displayName><![CDATA[Smart Categories]]></displayName>
-    <version><![CDATA[1.2.4]]></version>
+    <version><![CDATA[1.2.3]]></version>
     <description><![CDATA[Categorización automática de productos mediante reglas configurables y tareas cron]]></description>
     <author><![CDATA[Luis de Yrissarri]]></author>
     <tab><![CDATA[administration]]></tab>
