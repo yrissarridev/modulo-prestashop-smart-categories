@@ -251,6 +251,8 @@
                             <option value="in_categories"     {if $cond.condition_type == 'in_categories'}selected{/if}>Pertenece a categorías</option>
                             <option value="not_in_categories" {if $cond.condition_type == 'not_in_categories'}selected{/if}>Excluir categorías</option>
                             <option value="in_feature_values" {if $cond.condition_type == 'in_feature_values'}selected{/if}>Tiene característica con valor</option>
+                            <option value="in_attributes"     {if $cond.condition_type == 'in_attributes'}selected{/if}>Tiene atributo/variante con valor</option>
+                            <option value="not_in_attributes" {if $cond.condition_type == 'not_in_attributes'}selected{/if}>Excluir atributo/variante con valor</option>
                           </optgroup>
                           <optgroup label="Marca">
                             <option value="in_manufacturers"     {if $cond.condition_type == 'in_manufacturers'}selected{/if}>Pertenece a marca(s)</option>
@@ -366,6 +368,7 @@ var scCreateCatUrl      = '{$create_cat_url}';
 var scFilterCategories  = {$filter_categories|json_encode};
 var scFilterFeatures    = {$filter_features|json_encode};
 var scFilterManufacturers = {$filter_manufacturers|json_encode};
+var scFilterAttributes = {$filter_attributes|json_encode};
 var scExistingConditions = {$conditions|json_encode};
 var scConditionIndex     = {$conditions|count};
 </script>
@@ -441,6 +444,28 @@ function scBuildFeaturesCheckboxes(selectedIds) {
   scFilterFeatures.forEach(function(feat) {
     html += '<div class="sc-check-group-title">' + feat.feature_name + '</div>';
     feat.values.forEach(function(val) {
+      var checked = selectedIds.indexOf(String(val.id)) !== -1 || selectedIds.indexOf(val.id) !== -1 ? 'checked' : '';
+      html += '<label class="sc-check-item sc-check-item-value">'
+        + '<input type="checkbox" value="' + val.id + '" ' + checked + ' onchange="scSyncMultiHidden(this)">'
+        + '<span>' + val.name + '</span></label>';
+    });
+  });
+  html += '</div></div>';
+  return html;
+}
+
+function scBuildAttributesCheckboxes(selectedIds, exclude) {
+  selectedIds = selectedIds || [];
+  var label = exclude ? 'Excluir valor(es) de atributo (puede seleccionar varios)' : 'Valor(es) de atributo (puede seleccionar varios)';
+  var html = '<div class="sc-form-group">'
+    + '<label class="sc-label">' + label + '</label>'
+    + '<input type="hidden" name="condition_value[]" class="sc-multisel-hidden" value="' + selectedIds.join(',') + '">'
+    + '<input type="hidden" name="condition_value2[]" value="">'
+    + '<div class="sc-multicheck-search"><input type="text" class="sc-input sc-input-sm sc-multicheck-filter" placeholder="Buscar atributo o valor..." oninput="scFilterCheckboxes(this)"></div>'
+    + '<div class="sc-multicheck-list">';
+  scFilterAttributes.forEach(function(group) {
+    html += '<div class="sc-check-group-title">' + group.group_name + '</div>';
+    group.values.forEach(function(val) {
       var checked = selectedIds.indexOf(String(val.id)) !== -1 || selectedIds.indexOf(val.id) !== -1 ? 'checked' : '';
       html += '<label class="sc-check-item sc-check-item-value">'
         + '<input type="checkbox" value="' + val.id + '" ' + checked + ' onchange="scSyncMultiHidden(this)">'
@@ -551,6 +576,12 @@ function scBuildValueHtml(type, val1, val2) {
   } else if (type === 'in_feature_values') {
     var ids = val1 ? val1.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
     return scBuildFeaturesCheckboxes(ids);
+  } else if (type === 'in_attributes') {
+    var ids = val1 ? val1.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
+    return scBuildAttributesCheckboxes(ids, false);
+  } else if (type === 'not_in_attributes') {
+    var ids = val1 ? val1.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
+    return scBuildAttributesCheckboxes(ids, true);
   } else if (type === 'in_manufacturers') {
     var ids = val1 ? val1.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
     return scBuildManufacturersCheckboxes(ids, false);
@@ -593,6 +624,8 @@ function scConditionTypeOptions(selected) {
     + '<option value="in_categories"' + (selected==='in_categories'?' selected':'') + '>Pertenece a categor\u00edas</option>'
     + '<option value="not_in_categories"' + (selected==='not_in_categories'?' selected':'') + '>Excluir categor\u00edas</option>'
     + '<option value="in_feature_values"' + (selected==='in_feature_values'?' selected':'') + '>Tiene caracter\u00edstica con valor</option>'
+    + '<option value="in_attributes"' + (selected==='in_attributes'?' selected':'') + '>Tiene atributo/variante con valor</option>'
+    + '<option value="not_in_attributes"' + (selected==='not_in_attributes'?' selected':'') + '>Excluir atributo/variante con valor</option>'
     + '</optgroup>'
     + '<optgroup label="Marca">'
     + '<option value="in_manufacturers"' + (selected==='in_manufacturers'?' selected':'') + '>Pertenece a marca(s)</option>'

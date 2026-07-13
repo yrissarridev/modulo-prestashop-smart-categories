@@ -71,9 +71,11 @@ class SmartCategoryCondition extends ObjectModel
             'catalog' => [
                 'label' => 'Catálogo',
                 'types' => [
-                    'in_categories'     => 'Pertenece a categorías (cualquiera)',
-                    'not_in_categories' => 'Excluir categorías (ninguna de estas)',
-                    'in_feature_values' => 'Tiene característica con valor',
+                    'in_categories'      => 'Pertenece a categorías (cualquiera)',
+                    'not_in_categories'  => 'Excluir categorías (ninguna de estas)',
+                    'in_feature_values'  => 'Tiene característica con valor',
+                    'in_attributes'      => 'Tiene atributo/variante con valor (ej: Color=Rojo)',
+                    'not_in_attributes'  => 'Excluir atributo/variante con valor',
             'no_sales_since_days'  => 'Sin ventas en X días',
             'no_sales_ever'        => 'Nunca vendido',
                 ],
@@ -120,6 +122,8 @@ class SmartCategoryCondition extends ObjectModel
             'in_categories'      => 'Pertenece a categorías',
             'not_in_categories'  => 'Excluir categorías',
             'in_feature_values'  => 'Tiene característica con valor',
+            'in_attributes'      => 'Tiene atributo con valor',
+            'not_in_attributes'  => 'Excluir atributo con valor',
             'no_sales_since_days'  => 'Sin ventas en X días',
             'no_sales_ever'        => 'Nunca vendido',
         ];
@@ -162,6 +166,12 @@ class SmartCategoryCondition extends ObjectModel
             case 'in_feature_values':
                 $ids = array_filter(explode(',', $condition['value']));
                 return 'Tiene ' . count($ids) . ' valor(es) de característica seleccionado(s)';
+            case 'in_attributes':
+                $ids = array_filter(explode(',', $condition['value']));
+                return 'Tiene ' . count($ids) . ' valor(es) de atributo seleccionado(s)';
+            case 'not_in_attributes':
+                $ids = array_filter(explode(',', $condition['value']));
+                return 'Excluye ' . count($ids) . ' valor(es) de atributo';
             case 'no_sales_since_days':
                 return 'Sin ventas en los últimos ' . $condition['value'] . ' días';
             case 'no_sales_ever':

@@ -1,4 +1,4 @@
 {
-  "version": "1.2.5",
-  "changelog": "Chequeo de version remota mas robusto: fallback a cURL si file_get_contents falla, y aviso visible en el panel con el motivo exacto si no se puede comprobar."
+  "version": "1.2.6",
+  "changelog": "Fix: guardar o activar/desactivar una regla ahora re-ejecuta todas las reglas activas (no solo la tocada), para resolver condiciones cruzadas entre reglas (in_categories/not_in_categories/badges) que antes quedaban desincronizadas hasta el proximo cron. Se anade tambien el grupo de condicion 'Atributos' (variantes: color, talla, etc.) en Catalogo."
 }

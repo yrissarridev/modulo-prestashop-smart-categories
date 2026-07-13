@@ -446,6 +446,30 @@ class SmartCategoryRule extends ObjectModel
                     }
                     break;
 
+                case 'in_attributes':
+                    $ids = array_map('intval', array_filter(explode(',', $condition['value'])));
+                    if (!empty($ids)) {
+                        $inList = implode(',', $ids);
+                        $conditionWheres[] = 'p.id_product IN ('
+                            . 'SELECT pa.id_product FROM `' . _DB_PREFIX_ . 'product_attribute` pa'
+                            . ' INNER JOIN `' . _DB_PREFIX_ . 'product_attribute_combination` pac ON (pac.id_product_attribute = pa.id_product_attribute)'
+                            . ' WHERE pac.id_attribute IN (' . $inList . ')'
+                            . ')';
+                    }
+                    break;
+
+                case 'not_in_attributes':
+                    $ids = array_map('intval', array_filter(explode(',', $condition['value'])));
+                    if (!empty($ids)) {
+                        $inList = implode(',', $ids);
+                        $conditionWheres[] = 'p.id_product NOT IN ('
+                            . 'SELECT pa.id_product FROM `' . _DB_PREFIX_ . 'product_attribute` pa'
+                            . ' INNER JOIN `' . _DB_PREFIX_ . 'product_attribute_combination` pac ON (pac.id_product_attribute = pa.id_product_attribute)'
+                            . ' WHERE pac.id_attribute IN (' . $inList . ')'
+                            . ')';
+                    }
+                    break;
+
                 case 'in_manufacturers':
                     $ids = array_map('intval', array_filter(explode(',', $condition['value'])));
                     if (!empty($ids)) {
@@ -824,6 +848,45 @@ class SmartCategoryRule extends ObjectModel
         }
 
         return $result;
+    }
+
+    /**
+     * Obtener atributos (variantes: Color, Talla, etc.) y sus valores para el selector de condiciones.
+     * Devuelve: [ ['id_attribute_group' => X, 'group_name' => 'Color', 'values' => [ ['id' => Y, 'name' => 'Rojo'], ... ] ], ... ]
+     */
+    public static function getAttributesForCondition()
+    {
+        $idLang = (int) Context::getContext()->language->id;
+
+        $rows = Db::getInstance()->executeS(
+            'SELECT ag.id_attribute_group, agl.name as group_name,
+                    a.id_attribute, al.name as attribute_name
+             FROM `' . _DB_PREFIX_ . 'attribute_group` ag
+             INNER JOIN `' . _DB_PREFIX_ . 'attribute_group_lang` agl
+                ON (agl.id_attribute_group = ag.id_attribute_group AND agl.id_lang = ' . $idLang . ')
+             INNER JOIN `' . _DB_PREFIX_ . 'attribute` a
+                ON (a.id_attribute_group = ag.id_attribute_group)
+             INNER JOIN `' . _DB_PREFIX_ . 'attribute_lang` al
+                ON (al.id_attribute = a.id_attribute AND al.id_lang = ' . $idLang . ')
+             ORDER BY agl.name ASC, al.name ASC'
+        ) ?: [];
+
+        $grouped = [];
+        foreach ($rows as $row) {
+            $gid = (int) $row['id_attribute_group'];
+            if (!isset($grouped[$gid])) {
+                $grouped[$gid] = [
+                    'id_attribute_group' => $gid,
+                    'group_name'         => $row['group_name'],
+                    'values'             => [],
+                ];
+            }
+            $grouped[$gid]['values'][] = [
+                'id'   => (int) $row['id_attribute'],
+                'name' => $row['attribute_name'],
+            ];
+        }
+        return array_values($grouped);
     }
 
     public function getScheduleStatusLabel()

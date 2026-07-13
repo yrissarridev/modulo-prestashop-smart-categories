@@ -194,6 +194,7 @@ class AdminSmartCategoriesController extends ModuleAdminController
             'filter_categories'    => SmartCategoryRule::getCategoriesForCondition(),
             'filter_features'      => SmartCategoryRule::getFeaturesForCondition(),
             'filter_manufacturers' => SmartCategoryRule::getManufacturersForCondition(),
+            'filter_attributes'    => SmartCategoryRule::getAttributesForCondition(),
             'start_date_input'     => ($rule && !empty($rule->start_date)) ? SmartCategoryRule::formatDatetimeForInput($rule->start_date) : '',
             'end_date_input'       => ($rule && !empty($rule->end_date)) ? SmartCategoryRule::formatDatetimeForInput($rule->end_date) : '',
         ]);
