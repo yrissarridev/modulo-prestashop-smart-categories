@@ -94,6 +94,33 @@
             </div>
 
             <div class="sc-form-group sc-span-2">
+              <label class="sc-label sc-label-check">
+                <input type="hidden" name="discount_enabled" value="0">
+                <input type="checkbox" id="ruleDiscountEnabled" name="discount_enabled" value="1"
+                  onchange="scToggleDiscountFields(this)"
+                  {if $rule && $rule->id_rule && $rule->discount_enabled}checked{/if}>
+                Aplicar descuento real (precio específico) a los productos que cumplen
+              </label>
+              <span class="sc-hint">Si la condición es de tipo Atributos, el descuento se aplica solo a la variante exacta que cumple (ej: solo el color Cubano, no todo el producto). Se retira automáticamente cuando el producto o la variante dejan de cumplir la regla.</span>
+
+              <div id="scDiscountFields" style="display:{if $rule && $rule->id_rule && $rule->discount_enabled}flex{else}none{/if};gap:16px;margin-top:10px;align-items:flex-end;flex-wrap:wrap">
+                <div class="sc-form-group">
+                  <label class="sc-label" for="ruleDiscountType">Tipo</label>
+                  <select id="ruleDiscountType" name="discount_type" class="sc-select">
+                    <option value="percentage" {if $rule && $rule->id_rule && $rule->discount_type == 'percentage'}selected{/if}>Porcentaje (%)</option>
+                    <option value="amount" {if $rule && $rule->id_rule && $rule->discount_type == 'amount'}selected{/if}>Importe fijo (€)</option>
+                  </select>
+                </div>
+                <div class="sc-form-group">
+                  <label class="sc-label" for="ruleDiscountValue">Valor del descuento</label>
+                  <input type="number" id="ruleDiscountValue" name="discount_value" class="sc-input sc-input-sm"
+                         step="0.01" min="0"
+                         value="{if $rule && $rule->id_rule}{$rule->discount_value|escape:'html'}{else}0{/if}">
+                </div>
+              </div>
+            </div>
+
+            <div class="sc-form-group sc-span-2">
               <label class="sc-label" for="ruleFlagText">Etiqueta en productos <span class="sc-optional">(opcional)</span></label>
               <div class="sc-badge-editor">
                 <div class="sc-form-group">
@@ -636,6 +663,12 @@ function scConditionTypeOptions(selected) {
     + '<option value="no_sales_ever"' + (selected==='no_sales_ever'?' selected':'') + '>Nunca vendido</option>'
     + '</optgroup>';
   return opts;
+}
+
+function scToggleDiscountFields(checkbox) {
+  var fields = document.getElementById('scDiscountFields');
+  if (!fields) return;
+  fields.style.display = checkbox.checked ? 'flex' : 'none';
 }
 
 function scUpdateConditionFields(select) {

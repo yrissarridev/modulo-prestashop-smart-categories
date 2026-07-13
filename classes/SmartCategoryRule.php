@@ -25,6 +25,9 @@ class SmartCategoryRule extends ObjectModel
     public $product_sel_type = 'class';
     public $product_sel_value = 'product-prices';
     public $product_position = 'prepend';
+    public $discount_enabled = 0;
+    public $discount_type = 'percentage';
+    public $discount_value = 0;
     public $date_add;
     public $date_upd;
 
@@ -47,6 +50,9 @@ class SmartCategoryRule extends ObjectModel
             'product_sel_type'  => ['type' => self::TYPE_STRING, 'size' => 10],
             'product_sel_value' => ['type' => self::TYPE_STRING, 'size' => 255],
             'product_position'  => ['type' => self::TYPE_STRING, 'size' => 10],
+            'discount_enabled'  => ['type' => self::TYPE_BOOL, 'validate' => 'isBool'],
+            'discount_type'     => ['type' => self::TYPE_STRING, 'size' => 20],
+            'discount_value'    => ['type' => self::TYPE_FLOAT, 'validate' => 'isFloat'],
             'date_add'    => ['type' => self::TYPE_DATE],
             'date_upd'    => ['type' => self::TYPE_DATE],
         ],
@@ -78,6 +84,9 @@ class SmartCategoryRule extends ObjectModel
                 $rule->start_date = !empty($row['start_date']) ? $row['start_date'] : null;
                 $rule->end_date   = !empty($row['end_date']) ? $row['end_date'] : null;
                 $rule->noindex    = isset($row['noindex']) ? (int) $row['noindex'] : 0;
+                $rule->discount_enabled = isset($row['discount_enabled']) ? (int) $row['discount_enabled'] : 0;
+                $rule->discount_type    = isset($row['discount_type'])    ? $row['discount_type']    : 'percentage';
+                $rule->discount_value   = isset($row['discount_value'])   ? (float) $row['discount_value']   : 0;
                 $rules[] = $rule;
             }
         }
@@ -200,6 +209,7 @@ class SmartCategoryRule extends ObjectModel
 
             Db::getInstance()->delete('smartcategory_rule_products', 'id_rule = ' . (int) $this->id_rule);
             Db::getInstance()->delete('smartcategory_badges', 'id_rule = ' . (int) $this->id_rule);
+            $this->syncSpecificPrices([]);
             $this->setCategoryActive(false);
             $this->applyCategoryIndexation();
 
@@ -340,6 +350,14 @@ class SmartCategoryRule extends ObjectModel
             }
             $this->removeBadge($toRemove);
 
+            // Gestionar precios especificos (descuentos por combinacion exacta) si estan activados.
+            if ((int) $this->discount_enabled) {
+                $pairs = $this->getMatchingProductAttributePairs($conditions);
+                $this->syncSpecificPrices($pairs);
+            } else {
+                $this->syncSpecificPrices([]);
+            }
+
             // Aplicar configuración de indexación a la categoría destino
             $this->applyCategoryIndexation();
 
@@ -459,13 +477,26 @@ class SmartCategoryRule extends ObjectModel
                     break;
 
                 case 'not_in_attributes':
+                    // Permisivo a nivel de PRODUCTO: excluye solo si NINGUNA de sus combinaciones
+                    // se libra del atributo excluido. Si tiene al menos una variante limpia (ej:
+                    // White, aunque tambien tenga Black), el producto entra en la categoria igual;
+                    // el descuento (calculado aparte, por combinacion) es el que decide cual variante
+                    // exacta lleva el precio rebajado.
                     $ids = array_map('intval', array_filter(explode(',', $condition['value'])));
                     if (!empty($ids)) {
                         $inList = implode(',', $ids);
-                        $conditionWheres[] = 'p.id_product NOT IN ('
-                            . 'SELECT pa.id_product FROM `' . _DB_PREFIX_ . 'product_attribute` pa'
-                            . ' INNER JOIN `' . _DB_PREFIX_ . 'product_attribute_combination` pac ON (pac.id_product_attribute = pa.id_product_attribute)'
-                            . ' WHERE pac.id_attribute IN (' . $inList . ')'
+                        $conditionWheres[] = '('
+                            . 'EXISTS ('
+                            . 'SELECT 1 FROM `' . _DB_PREFIX_ . 'product_attribute` pa_ex'
+                            . ' WHERE pa_ex.id_product = p.id_product'
+                            . ' AND pa_ex.id_product_attribute NOT IN ('
+                            . 'SELECT pac_ex.id_product_attribute FROM `' . _DB_PREFIX_ . 'product_attribute_combination` pac_ex'
+                            . ' WHERE pac_ex.id_attribute IN (' . $inList . ')'
+                            . ')'
+                            . ')'
+                            . ' OR NOT EXISTS ('
+                            . 'SELECT 1 FROM `' . _DB_PREFIX_ . 'product_attribute` pa_none WHERE pa_none.id_product = p.id_product'
+                            . ')'
                             . ')';
                     }
                     break;
@@ -517,6 +548,250 @@ class SmartCategoryRule extends ObjectModel
         }
 
         return array_column($rows, 'id_product');
+    }
+
+    /**
+     * A partir de los productos que ya cumplen todas las condiciones (nivel producto),
+     * determina QUE COMBINACION exacta de cada producto cumple tambien las condiciones
+     * de atributos (in_attributes / not_in_attributes), si las hay.
+     *
+     * Devuelve pares [id_product, id_product_attribute]. id_product_attribute = 0 significa
+     * "producto sin combinaciones" o "aplica al producto entero" (sin condicion de atributos).
+     *
+     * Esto es lo que permite que un producto con variantes Cubano/Negro/Cielo reciba el
+     * descuento solo en la combinacion Cubano si la regla excluye Negro, en vez de
+     * incluir o excluir el producto entero de golpe.
+     */
+    private function getMatchingProductAttributePairs(array $conditions)
+    {
+        $matchingProductIds = array_map('intval', $this->getMatchingProducts($conditions));
+        if (empty($matchingProductIds)) {
+            return [];
+        }
+
+        $attrIn = [];
+        $attrNotIn = [];
+        foreach ($conditions as $condition) {
+            if ($condition['condition_type'] === 'in_attributes') {
+                $attrIn = array_merge($attrIn, array_map('intval', array_filter(explode(',', $condition['value']))));
+            } elseif ($condition['condition_type'] === 'not_in_attributes') {
+                $attrNotIn = array_merge($attrNotIn, array_map('intval', array_filter(explode(',', $condition['value']))));
+            }
+        }
+
+        $idList = implode(',', $matchingProductIds);
+
+        $rows = Db::getInstance()->executeS(
+            'SELECT pa.id_product, pa.id_product_attribute, pac.id_attribute
+             FROM `' . _DB_PREFIX_ . 'product_attribute` pa
+             LEFT JOIN `' . _DB_PREFIX_ . 'product_attribute_combination` pac
+                ON (pac.id_product_attribute = pa.id_product_attribute)
+             WHERE pa.id_product IN (' . $idList . ')'
+        ) ?: [];
+
+        $combos = [];
+        foreach ($rows as $row) {
+            $pa = (int) $row['id_product_attribute'];
+            if (!isset($combos[$pa])) {
+                $combos[$pa] = ['id_product' => (int) $row['id_product'], 'attrs' => []];
+            }
+            if ($row['id_attribute'] !== null) {
+                $combos[$pa]['attrs'][] = (int) $row['id_attribute'];
+            }
+        }
+
+        $productsWithCombos = [];
+        foreach ($combos as $data) {
+            $productsWithCombos[$data['id_product']] = true;
+        }
+
+        $pairs = [];
+        foreach ($matchingProductIds as $idProduct) {
+            if (!isset($productsWithCombos[$idProduct])) {
+                $pairs[] = ['id_product' => $idProduct, 'id_product_attribute' => 0];
+                continue;
+            }
+
+            foreach ($combos as $pa => $data) {
+                if ($data['id_product'] !== $idProduct) {
+                    continue;
+                }
+                $attrs = $data['attrs'];
+
+                if (!empty($attrIn) && empty(array_intersect($attrIn, $attrs))) {
+                    continue;
+                }
+                if (!empty($attrNotIn) && !empty(array_intersect($attrNotIn, $attrs))) {
+                    continue;
+                }
+
+                $pairs[] = ['id_product' => $idProduct, 'id_product_attribute' => (int) $pa];
+            }
+        }
+
+        return $pairs;
+    }
+
+    /**
+     * Compone la leyenda legible de la promocion a partir de las condiciones reales de la
+     * regla: categorias, atributos, y fecha de fin (o "fin de existencias" si no hay).
+     * Ej: "10% en Camisetas, Pantalones - Color: Rojo, Blanco, Verde - hasta 31/07/2026"
+     */
+    private function composeDiscountLegend(array $conditions)
+    {
+        $idLang = (int) Context::getContext()->language->id;
+        $db = Db::getInstance();
+
+        $discountText = '';
+        if ((float) $this->discount_value > 0) {
+            $formatted = rtrim(rtrim(number_format((float) $this->discount_value, 2, ',', '.'), '0'), ',');
+            $discountText = ($this->discount_type === 'amount') ? $formatted . '€' : $formatted . '%';
+        }
+
+        $categoryIds = [];
+        $attrIds = [];
+        $groupName = '';
+        foreach ($conditions as $c) {
+            if ($c['condition_type'] === 'in_categories') {
+                $categoryIds = array_merge($categoryIds, array_map('intval', array_filter(explode(',', $c['value']))));
+            } elseif ($c['condition_type'] === 'in_attributes' || $c['condition_type'] === 'not_in_attributes') {
+                $attrIds = array_merge($attrIds, array_map('intval', array_filter(explode(',', $c['value']))));
+            }
+        }
+
+        $categoryNames = [];
+        if (!empty($categoryIds)) {
+            $inList = implode(',', array_unique($categoryIds));
+            $rows = $db->executeS(
+                'SELECT name FROM `' . _DB_PREFIX_ . 'category_lang` WHERE id_category IN (' . $inList . ') AND id_lang = ' . $idLang
+            ) ?: [];
+            foreach ($rows as $r) {
+                $categoryNames[] = $r['name'];
+            }
+        }
+
+        $attrNames = [];
+        if (!empty($attrIds)) {
+            $inList = implode(',', array_unique($attrIds));
+            $rows = $db->executeS(
+                'SELECT al.name, agl.name AS group_name
+                 FROM `' . _DB_PREFIX_ . 'attribute` a
+                 INNER JOIN `' . _DB_PREFIX_ . 'attribute_lang` al ON (al.id_attribute = a.id_attribute AND al.id_lang = ' . $idLang . ')
+                 INNER JOIN `' . _DB_PREFIX_ . 'attribute_group_lang` agl ON (agl.id_attribute_group = a.id_attribute_group AND agl.id_lang = ' . $idLang . ')
+                 WHERE a.id_attribute IN (' . $inList . ')'
+            ) ?: [];
+            foreach ($rows as $r) {
+                $attrNames[] = $r['name'];
+                if (!$groupName) {
+                    $groupName = $r['group_name'];
+                }
+            }
+        }
+
+        $dateText = $this->hasValidEndDate()
+            ? 'hasta ' . date('d/m/Y', strtotime($this->end_date))
+            : 'hasta fin de existencias';
+
+        $parts = [];
+        if ($discountText) {
+            $catText = !empty($categoryNames) ? ' en ' . implode(', ', $categoryNames) : '';
+            $parts[] = $discountText . $catText;
+        }
+        if (!empty($attrNames)) {
+            $parts[] = ($groupName ?: 'Atributo') . ': ' . implode(', ', $attrNames);
+        }
+        $parts[] = $dateText;
+
+        $body = implode(' · ', $parts);
+
+        return $this->name . ': ' . $body;
+    }
+
+    /**
+     * Sincroniza ps_specific_price con la lista de pares [id_product, id_product_attribute]
+     * que deben tener descuento AHORA MISMO segun esta regla. Crea lo que falta, borra lo
+     * que sobra, sin tocar precios especificos de otras reglas o manuales.
+     */
+    private function syncSpecificPrices(array $pairs)
+    {
+        $db = Db::getInstance();
+        $idRule = (int) $this->id_rule;
+
+        $tracked = $db->executeS(
+            'SELECT id_row, id_product, id_product_attribute, id_specific_price
+             FROM `' . _DB_PREFIX_ . 'smartcategory_specific_prices`
+             WHERE id_rule = ' . $idRule
+        ) ?: [];
+
+        $trackedMap = [];
+        foreach ($tracked as $t) {
+            $key = $t['id_product'] . '_' . $t['id_product_attribute'];
+            $trackedMap[$key] = $t;
+        }
+
+        $wantedMap = [];
+        foreach ($pairs as $p) {
+            $key = $p['id_product'] . '_' . $p['id_product_attribute'];
+            $wantedMap[$key] = $p;
+        }
+
+        // Borrar lo que ya no debe tener descuento
+        foreach ($trackedMap as $key => $t) {
+            if (!isset($wantedMap[$key])) {
+                $db->execute('DELETE FROM `' . _DB_PREFIX_ . 'specific_price` WHERE id_specific_price = ' . (int) $t['id_specific_price']);
+                $db->execute('DELETE FROM `' . _DB_PREFIX_ . 'smartcategory_specific_prices` WHERE id_row = ' . (int) $t['id_row']);
+            }
+        }
+
+        // Crear lo que falta
+        $reductionType = ($this->discount_type === 'amount') ? 'amount' : 'percentage';
+        $reductionValue = (float) $this->discount_value;
+        $idShop = (int) Context::getContext()->shop->id;
+        $legendText = $this->composeDiscountLegend($this->getConditions());
+
+        // Actualizar la leyenda de las filas que ya existian (por si el texto de la regla,
+        // sus categorias, atributos o fecha de fin cambiaron desde la ultima ejecucion).
+        foreach ($trackedMap as $key => $t) {
+            if (isset($wantedMap[$key])) {
+                $db->update('smartcategory_specific_prices', ['legend_text' => pSQL($legendText)], 'id_row = ' . (int) $t['id_row']);
+            }
+        }
+
+        foreach ($wantedMap as $key => $p) {
+            if (isset($trackedMap[$key])) {
+                continue; // ya existe, no duplicar el precio (la leyenda ya se actualizo arriba)
+            }
+
+            $db->insert('specific_price', [
+                'id_specific_price_rule' => 0,
+                'id_cart'       => 0,
+                'id_product'    => (int) $p['id_product'],
+                'id_shop'       => $idShop,
+                'id_shop_group' => 0,
+                'id_currency'   => 0,
+                'id_country'    => 0,
+                'id_group'      => 0,
+                'id_customer'   => 0,
+                'id_product_attribute' => (int) $p['id_product_attribute'],
+                'price'          => -1,
+                'from_quantity'  => 1,
+                'reduction'      => $reductionType === 'percentage' ? ($reductionValue / 100) : $reductionValue,
+                'reduction_tax'  => 1,
+                'reduction_type' => $reductionType,
+                'from' => '0000-00-00 00:00:00',
+                'to'   => '0000-00-00 00:00:00',
+            ]);
+            $newId = (int) $db->Insert_ID();
+
+            $db->insert('smartcategory_specific_prices', [
+                'id_rule' => $idRule,
+                'id_product' => (int) $p['id_product'],
+                'id_product_attribute' => (int) $p['id_product_attribute'],
+                'id_specific_price' => $newId,
+                'legend_text' => pSQL($legendText),
+                'date_add' => date('Y-m-d H:i:s'),
+            ]);
+        }
     }
 
     /**

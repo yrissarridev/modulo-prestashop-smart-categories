@@ -19,7 +19,7 @@ class SmartCategories extends Module
     {
         $this->name = 'smartcategories';
         $this->tab = 'administration';
-        $this->version = '1.2.6';
+        $this->version = '1.3.0';
         $this->author = 'Luis de Yrissarri';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = [
@@ -177,8 +177,42 @@ class SmartCategories extends Module
         $this->ensureColumnExists('smartcategory_rules', 'product_position', "VARCHAR(10) DEFAULT 'prepend'");
         $this->ensureColumnExists('smartcategory_badges', 'badge_bg', "VARCHAR(7) NOT NULL DEFAULT '#e84444'");
         $this->ensureColumnExists('smartcategory_badges', 'badge_color', "VARCHAR(7) NOT NULL DEFAULT '#ffffff'");
+        $this->ensureColumnExists('smartcategory_rules', 'discount_enabled', "TINYINT(1) NOT NULL DEFAULT 0");
+        $this->ensureColumnExists('smartcategory_rules', 'discount_type', "ENUM('amount','percentage') NOT NULL DEFAULT 'percentage'");
+        $this->ensureColumnExists('smartcategory_rules', 'discount_value', "DECIMAL(20,6) NOT NULL DEFAULT 0");
+        $this->scEnsureSpecificPricesTable();
 
         return true;
+    }
+
+    /**
+     * Crea la tabla de seguimiento de precios especificos si no existe todavia.
+     * Cada fila registra que id_specific_price (de PrestaShop) creo esta regla
+     * para poder borrarla limpiamente cuando el producto/variante deja de cumplir.
+     */
+    private function scEnsureSpecificPricesTable()
+    {
+        $tables = Db::getInstance()->executeS(
+            "SHOW TABLES LIKE '" . _DB_PREFIX_ . "smartcategory_specific_prices'"
+        );
+        if (!empty($tables)) {
+            return;
+        }
+
+        Db::getInstance()->execute(
+            'CREATE TABLE `' . _DB_PREFIX_ . 'smartcategory_specific_prices` (
+                `id_row` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+                `id_rule` INT(10) UNSIGNED NOT NULL,
+                `id_product` INT(10) UNSIGNED NOT NULL,
+                `id_product_attribute` INT(10) UNSIGNED NOT NULL DEFAULT 0,
+                `id_specific_price` INT(10) UNSIGNED NOT NULL,
+                `date_add` DATETIME NOT NULL,
+                PRIMARY KEY (`id_row`),
+                UNIQUE KEY `uniq_rule_product_attr` (`id_rule`, `id_product`, `id_product_attribute`),
+                KEY `idx_specific_price` (`id_specific_price`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+        );
+        $this->scLog('scEnsureColumns: smartcategory_specific_prices table created');
     }
 
     private function ensureColumnExists($table, $column, $definition)
@@ -317,9 +351,60 @@ class SmartCategories extends Module
             }
         }
 
-        if (empty($rows)) {
+        // Leyendas de descuento (precio especifico) por producto y combinacion exacta
+        $legendRows = $db->executeS(
+            'SELECT id_product, id_product_attribute, legend_text
+             FROM `' . _DB_PREFIX_ . 'smartcategory_specific_prices`
+             WHERE legend_text IS NOT NULL AND legend_text != \'\''
+        ) ?: [];
+
+        if (empty($rows) && empty($legendRows)) {
             return '';
         }
+
+        $legendMap = [];
+        foreach ($legendRows as $lr) {
+            $pid = (int) $lr['id_product'];
+            $pa  = (int) $lr['id_product_attribute'];
+            if (!isset($legendMap[$pid])) {
+                $legendMap[$pid] = [];
+            }
+            $legendMap[$pid][$pa] = htmlspecialchars($lr['legend_text'], ENT_QUOTES, 'UTF-8');
+        }
+        $legendJson = json_encode($legendMap);
+
+        // Mapa de combinaciones para los productos con leyenda: permite calcular en JS que
+        // id_product_attribute corresponde a la seleccion actual del comprador, sin depender
+        // de ningun campo que el tema pinte (varia entre temas, muchos lo calculan solo por AJAX).
+        $comboMap = [];
+        if (!empty($legendMap)) {
+            $legendProductIds = implode(',', array_map('intval', array_keys($legendMap)));
+            $comboRows = $db->executeS(
+                'SELECT pa.id_product, pa.id_product_attribute, pac.id_attribute
+                 FROM `' . _DB_PREFIX_ . 'product_attribute` pa
+                 INNER JOIN `' . _DB_PREFIX_ . 'product_attribute_combination` pac
+                    ON (pac.id_product_attribute = pa.id_product_attribute)
+                 WHERE pa.id_product IN (' . $legendProductIds . ')'
+            ) ?: [];
+
+            $grouped = [];
+            foreach ($comboRows as $row) {
+                $pa = (int) $row['id_product_attribute'];
+                if (!isset($grouped[$pa])) {
+                    $grouped[$pa] = ['id_product' => (int) $row['id_product'], 'attrs' => []];
+                }
+                $grouped[$pa]['attrs'][] = (int) $row['id_attribute'];
+            }
+            foreach ($grouped as $pa => $data) {
+                sort($data['attrs']);
+                $key = implode('_', $data['attrs']);
+                if (!isset($comboMap[$data['id_product']])) {
+                    $comboMap[$data['id_product']] = [];
+                }
+                $comboMap[$data['id_product']][$key] = $pa;
+            }
+        }
+        $comboJson = json_encode($comboMap);
 
         // Construir mapa id_product => [ {text,bg,color,listingSel,listingPos,productSel,productPos}, ... ]
         $validTypes = ['id', 'class', 'attr', 'other'];
@@ -363,6 +448,8 @@ class SmartCategories extends Module
 <script>
 (function () {
   var SC_BADGES = {$json};
+  var SC_LEGENDS = {$legendJson};
+  var SC_COMBOS = {$comboJson};
 
   function scBuildEl(badge) {
     var el = document.createElement('div');
@@ -439,6 +526,82 @@ class SmartCategories extends Module
     var container = document.querySelector('#js-product-list, .js-product-list, .products');
     if (container) {
       scObserver.observe(container.parentNode || container, { childList: true, subtree: true });
+    }
+  });
+
+  // ── LEYENDA DE DESCUENTO POR VARIANTE (ficha de producto) ──
+  function scGetSelectedCombinationId(idProduct) {
+    // Fallback 1: si el tema SI pinta un campo con la combinacion ya calculada, usarlo.
+    var input = document.getElementById('idCombination');
+    if (input && input.value) return parseInt(input.value, 10);
+
+    // Fallback 2 (robusto, funciona en cualquier tema): leer que valores estan
+    // seleccionados en los selectores group[N] y cruzarlos contra SC_COMBOS.
+    if (!SC_COMBOS[idProduct]) return 0;
+
+    var selected = [];
+    var inputs = document.querySelectorAll('[name^="group["]');
+    inputs.forEach(function(el) {
+      var isRadio = el.type === 'radio';
+      var isSelect = el.tagName === 'SELECT';
+      if ((isRadio && el.checked) || isSelect) {
+        var val = parseInt(el.value, 10);
+        if (val) selected.push(val);
+      }
+    });
+    selected.sort(function(a, b) { return a - b; });
+    var key = selected.join('_');
+
+    return SC_COMBOS[idProduct][key] || 0;
+  }
+
+  function scRemoveLegend() {
+    var el = document.getElementById('sc-discount-legend');
+    if (el) el.remove();
+  }
+
+  function scApplyLegend() {
+    var idInput = document.getElementById('product_page_product_id');
+    if (!idInput) return;
+    var idProduct = parseInt(idInput.value, 10);
+    if (!idProduct || !SC_LEGENDS[idProduct]) { scRemoveLegend(); return; }
+
+    var idCombination = scGetSelectedCombinationId(idProduct);
+    var text = SC_LEGENDS[idProduct][idCombination];
+    if (text === undefined) {
+      text = SC_LEGENDS[idProduct][0]; // fallback: sin combinaciones o descuento a nivel de producto
+    }
+
+    if (!text) { scRemoveLegend(); return; }
+
+    var el = document.getElementById('sc-discount-legend');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'sc-discount-legend';
+      el.style.cssText = 'font-size:.85rem;color:#c0392b;font-weight:600;margin:.4rem 0;padding:.3rem .6rem;'
+        + 'background:#fdf1f0;border-left:3px solid #c0392b;border-radius:2px;display:inline-block';
+      var anchor = document.getElementById('our_price_display')
+        || document.querySelector('.product-prices')
+        || document.querySelector('.product-quantity');
+      if (anchor) {
+        anchor.parentNode.insertBefore(el, anchor.nextSibling);
+      }
+    }
+    el.textContent = text;
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    scApplyLegend();
+    document.body.addEventListener('change', function(e) {
+      var t = e.target;
+      if (t && t.name && t.name.indexOf('group[') === 0) {
+        setTimeout(scApplyLegend, 400);
+      }
+    });
+    var combInput = document.getElementById('idCombination');
+    if (combInput) {
+      var legendObserver = new MutationObserver(scApplyLegend);
+      legendObserver.observe(combInput, { attributes: true, attributeFilter: ['value'] });
     }
   });
 })();

@@ -175,6 +175,9 @@ class AdminSmartCategoriesController extends ModuleAdminController
                 $rule->start_date = !empty($row['start_date']) ? $row['start_date'] : null;
                 $rule->end_date   = !empty($row['end_date']) ? $row['end_date'] : null;
                 $rule->noindex    = isset($row['noindex']) ? (int) $row['noindex'] : 0;
+                $rule->discount_enabled = isset($row['discount_enabled']) ? (int) $row['discount_enabled'] : 0;
+                $rule->discount_type    = isset($row['discount_type'])    ? $row['discount_type']    : 'percentage';
+                $rule->discount_value   = isset($row['discount_value'])   ? (float) $row['discount_value']   : 0;
             }
             $conditions = SmartCategoryCondition::getConditionsByRule($idRule);
         }
@@ -261,6 +264,20 @@ class AdminSmartCategoriesController extends ModuleAdminController
         if (!in_array($listingPosition, $validPositions)) $listingPosition = 'prepend';
         if (!in_array($productSelType,  $validTypes))     $productSelType  = 'class';
         if (!in_array($productPosition, $validPositions)) $productPosition = 'prepend';
+
+        $discountEnabled = (int) Tools::getValue('discount_enabled', 0);
+        $discountType    = Tools::getValue('discount_type', 'percentage');
+        $discountValue   = (float) str_replace(',', '.', Tools::getValue('discount_value', 0));
+        if (!in_array($discountType, ['amount', 'percentage'])) {
+            $discountType = 'percentage';
+        }
+        if ($discountValue < 0) {
+            $discountValue = 0;
+        }
+        if ($discountType === 'percentage' && $discountValue > 100) {
+            $discountValue = 100;
+        }
+
         $now        = date('Y-m-d H:i:s');
 
         // Garantizar que las columnas existen antes de intentar guardar
@@ -323,6 +340,9 @@ class AdminSmartCategoriesController extends ModuleAdminController
                     'product_sel_type'  => pSQL($productSelType),
                     'product_sel_value' => pSQL($productSelValue),
                     'product_position'  => pSQL($productPosition),
+                    'discount_enabled'  => (int) $discountEnabled,
+                    'discount_type'     => pSQL($discountType),
+                    'discount_value'    => (float) $discountValue,
                     'date_upd'    => pSQL($now),
                 ], 'id_rule = ' . (int) $idRule);
                 $savedId = $idRule;
@@ -343,6 +363,9 @@ class AdminSmartCategoriesController extends ModuleAdminController
                     'product_sel_type'  => pSQL($productSelType),
                     'product_sel_value' => pSQL($productSelValue),
                     'product_position'  => pSQL($productPosition),
+                    'discount_enabled'  => (int) $discountEnabled,
+                    'discount_type'     => pSQL($discountType),
+                    'discount_value'    => (float) $discountValue,
                     'date_add'    => pSQL($now),
                     'date_upd'    => pSQL($now),
                 ]);
@@ -463,6 +486,15 @@ class AdminSmartCategoriesController extends ModuleAdminController
             }
             SmartCategoryCondition::deleteByRule($idRule);
             $db->delete('smartcategory_badges', 'id_rule = ' . $idRule);
+
+            $trackedPrices = $db->executeS(
+                'SELECT id_specific_price FROM `' . _DB_PREFIX_ . 'smartcategory_specific_prices` WHERE id_rule = ' . $idRule
+            ) ?: [];
+            foreach ($trackedPrices as $tp) {
+                $db->delete('specific_price', 'id_specific_price = ' . (int) $tp['id_specific_price']);
+            }
+            $db->delete('smartcategory_specific_prices', 'id_rule = ' . $idRule);
+
             $db->delete('smartcategory_rules', 'id_rule = ' . $idRule);
             $db->delete('smartcategory_logs',  'id_rule = ' . $idRule);
         }
@@ -681,6 +713,43 @@ class AdminSmartCategoriesController extends ModuleAdminController
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
             );
             $this->scLog('scEnsureColumns: badges table created');
+        }
+
+        // Comprobar columnas de descuento
+        $cols = $db->executeS('SHOW COLUMNS FROM `' . $prefix . 'smartcategory_rules` LIKE \'discount_enabled\'');
+        if (empty($cols)) {
+            $db->execute('ALTER TABLE `' . $prefix . 'smartcategory_rules` ADD COLUMN `discount_enabled` TINYINT(1) NOT NULL DEFAULT 0');
+            $this->scLog('scEnsureColumns: discount_enabled column created');
+        }
+        $cols = $db->executeS('SHOW COLUMNS FROM `' . $prefix . 'smartcategory_rules` LIKE \'discount_type\'');
+        if (empty($cols)) {
+            $db->execute('ALTER TABLE `' . $prefix . 'smartcategory_rules` ADD COLUMN `discount_type` ENUM(\'amount\',\'percentage\') NOT NULL DEFAULT \'percentage\'');
+            $this->scLog('scEnsureColumns: discount_type column created');
+        }
+        $cols = $db->executeS('SHOW COLUMNS FROM `' . $prefix . 'smartcategory_rules` LIKE \'discount_value\'');
+        if (empty($cols)) {
+            $db->execute('ALTER TABLE `' . $prefix . 'smartcategory_rules` ADD COLUMN `discount_value` DECIMAL(20,6) NOT NULL DEFAULT 0');
+            $this->scLog('scEnsureColumns: discount_value column created');
+        }
+
+        // Comprobar si tabla de precios especificos existe
+        $tables = $db->executeS('SHOW TABLES LIKE \'' . $prefix . 'smartcategory_specific_prices\'');
+        if (empty($tables)) {
+            $db->execute(
+                'CREATE TABLE `' . $prefix . 'smartcategory_specific_prices` (
+                    `id_row` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+                    `id_rule` INT(10) UNSIGNED NOT NULL,
+                    `id_product` INT(10) UNSIGNED NOT NULL,
+                    `id_product_attribute` INT(10) UNSIGNED NOT NULL DEFAULT 0,
+                    `id_specific_price` INT(10) UNSIGNED NOT NULL,
+                    `legend_text` VARCHAR(255) DEFAULT \'\',
+                    `date_add` DATETIME NOT NULL,
+                    PRIMARY KEY (`id_row`),
+                    UNIQUE KEY `uniq_rule_product_attr` (`id_rule`, `id_product`, `id_product_attribute`),
+                    KEY `idx_specific_price` (`id_specific_price`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+            );
+            $this->scLog('scEnsureColumns: smartcategory_specific_prices table created');
         }
     }
 

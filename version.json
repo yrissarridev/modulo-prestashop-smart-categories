@@ -1,4 +1,4 @@
 {
-  "version": "1.2.6",
-  "changelog": "Fix: guardar o activar/desactivar una regla ahora re-ejecuta todas las reglas activas (no solo la tocada), para resolver condiciones cruzadas entre reglas (in_categories/not_in_categories/badges) que antes quedaban desincronizadas hasta el proximo cron. Se anade tambien el grupo de condicion 'Atributos' (variantes: color, talla, etc.) en Catalogo."
+  "version": "1.3.0",
+  "changelog": "Nueva funcionalidad: descuentos reales (precio especifico) por regla, aplicables a nivel de combinacion exacta (ej: solo el color Cubano, no todo el producto). Incluye leyenda dinamica junto al precio que reacciona a la variante seleccionada por el comprador, y limpieza automatica del descuento cuando el producto/variante deja de cumplir la regla."
 }
