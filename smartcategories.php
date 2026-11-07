@@ -806,4 +806,15 @@ HTML;
         return [false, 'file_get_contents: ' . $fgcError . ' | cURL no disponible en este servidor'];
     }
 
+    private function scLog($msg)
+    {
+        if (!Configuration::get('SC_DEBUG')) {
+            return;
+        }
+        file_put_contents(
+            dirname(__FILE__) . '/sc_debug.log',
+            date('Y-m-d H:i:s') . ' ' . $msg . "\n",
+            FILE_APPEND
+        );
+    }
 }
