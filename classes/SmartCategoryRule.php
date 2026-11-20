@@ -28,7 +28,7 @@ class SmartCategoryRule extends ObjectModel
     public $discount_enabled = 0;
     public $discount_type = 'percentage';
     public $discount_value = 0;
-    public $include_inactive = 0;
+    public $include_inactive = 1;
     public $date_add;
     public $date_upd;
 
@@ -89,7 +89,7 @@ class SmartCategoryRule extends ObjectModel
                 $rule->discount_enabled = isset($row['discount_enabled']) ? (int) $row['discount_enabled'] : 0;
                 $rule->discount_type    = isset($row['discount_type'])    ? $row['discount_type']    : 'percentage';
                 $rule->discount_value   = isset($row['discount_value'])   ? (float) $row['discount_value']   : 0;
-                $rule->include_inactive = isset($row['include_inactive']) ? (int) $row['include_inactive'] : 0;
+                $rule->include_inactive = isset($row['include_inactive']) ? (int) $row['include_inactive'] : 1;
                 $rules[] = $rule;
             }
         }

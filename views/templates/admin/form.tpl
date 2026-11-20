@@ -97,7 +97,7 @@
               <label class="sc-label sc-label-check">
                 <input type="hidden" name="include_inactive" value="0">
                 <input type="checkbox" name="include_inactive" value="1"
-                  {if $rule && $rule->id_rule && $rule->include_inactive}checked{/if}>
+                  {if !$rule || !$rule->id_rule || $rule->include_inactive}checked{/if}>
                 Incluir productos desactivados
               </label>
               <span class="sc-hint">Útil para productos que solo se venden en tienda física (TPV): reciben la categoría y el descuento aunque no se vean en la web.</span>

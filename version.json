@@ -1,4 +1,4 @@
 {
-  "version": "1.4.0",
-  "changelog": "Nueva opcion por regla: Incluir productos desactivados. Permite que productos desactivados en la web (por ejemplo, vendidos solo en el TPV de tienda fisica) reciban la categoria y el descuento de la regla. Apagada por defecto."
+  "version": "1.4.1",
+  "changelog": "La opcion por regla 'Incluir productos desactivados' pasa a estar ACTIVADA por defecto (reglas nuevas y columna nueva), porque los productos desactivados en la web se venden en el TPV de tienda fisica. Se puede desmarcar en cada regla."
 }

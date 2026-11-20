@@ -178,7 +178,7 @@ class AdminSmartCategoriesController extends ModuleAdminController
                 $rule->discount_enabled = isset($row['discount_enabled']) ? (int) $row['discount_enabled'] : 0;
                 $rule->discount_type    = isset($row['discount_type'])    ? $row['discount_type']    : 'percentage';
                 $rule->discount_value   = isset($row['discount_value'])   ? (float) $row['discount_value']   : 0;
-                $rule->include_inactive = isset($row['include_inactive']) ? (int) $row['include_inactive'] : 0;
+                $rule->include_inactive = isset($row['include_inactive']) ? (int) $row['include_inactive'] : 1;
             }
             $conditions = SmartCategoryCondition::getConditionsByRule($idRule);
         }
@@ -267,7 +267,7 @@ class AdminSmartCategoriesController extends ModuleAdminController
         if (!in_array($productPosition, $validPositions)) $productPosition = 'prepend';
 
         $discountEnabled = (int) Tools::getValue('discount_enabled', 0);
-        $includeInactive = (int) (bool) Tools::getValue('include_inactive', 0);
+        $includeInactive = (int) (bool) Tools::getValue('include_inactive', 1);
         $discountType    = Tools::getValue('discount_type', 'percentage');
         $discountValue   = (float) str_replace(',', '.', Tools::getValue('discount_value', 0));
         if (!in_array($discountType, ['amount', 'percentage'])) {
@@ -738,7 +738,7 @@ class AdminSmartCategoriesController extends ModuleAdminController
 
         $cols = $db->executeS('SHOW COLUMNS FROM `' . $prefix . 'smartcategory_rules` LIKE \'include_inactive\'');
         if (empty($cols)) {
-            $db->execute('ALTER TABLE `' . $prefix . 'smartcategory_rules` ADD COLUMN `include_inactive` TINYINT(1) NOT NULL DEFAULT 0');
+            $db->execute('ALTER TABLE `' . $prefix . 'smartcategory_rules` ADD COLUMN `include_inactive` TINYINT(1) NOT NULL DEFAULT 1');
             $this->scLog('scEnsureColumns: include_inactive column created');
         }
 
