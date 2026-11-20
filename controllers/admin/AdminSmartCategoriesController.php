@@ -178,6 +178,7 @@ class AdminSmartCategoriesController extends ModuleAdminController
                 $rule->discount_enabled = isset($row['discount_enabled']) ? (int) $row['discount_enabled'] : 0;
                 $rule->discount_type    = isset($row['discount_type'])    ? $row['discount_type']    : 'percentage';
                 $rule->discount_value   = isset($row['discount_value'])   ? (float) $row['discount_value']   : 0;
+                $rule->include_inactive = isset($row['include_inactive']) ? (int) $row['include_inactive'] : 0;
             }
             $conditions = SmartCategoryCondition::getConditionsByRule($idRule);
         }
@@ -266,6 +267,7 @@ class AdminSmartCategoriesController extends ModuleAdminController
         if (!in_array($productPosition, $validPositions)) $productPosition = 'prepend';
 
         $discountEnabled = (int) Tools::getValue('discount_enabled', 0);
+        $includeInactive = (int) (bool) Tools::getValue('include_inactive', 0);
         $discountType    = Tools::getValue('discount_type', 'percentage');
         $discountValue   = (float) str_replace(',', '.', Tools::getValue('discount_value', 0));
         if (!in_array($discountType, ['amount', 'percentage'])) {
@@ -343,6 +345,7 @@ class AdminSmartCategoriesController extends ModuleAdminController
                     'discount_enabled'  => (int) $discountEnabled,
                     'discount_type'     => pSQL($discountType),
                     'discount_value'    => (float) $discountValue,
+                    'include_inactive'  => (int) $includeInactive,
                     'date_upd'    => pSQL($now),
                 ], 'id_rule = ' . (int) $idRule);
                 $savedId = $idRule;
@@ -366,6 +369,7 @@ class AdminSmartCategoriesController extends ModuleAdminController
                     'discount_enabled'  => (int) $discountEnabled,
                     'discount_type'     => pSQL($discountType),
                     'discount_value'    => (float) $discountValue,
+                    'include_inactive'  => (int) $includeInactive,
                     'date_add'    => pSQL($now),
                     'date_upd'    => pSQL($now),
                 ]);
@@ -730,6 +734,12 @@ class AdminSmartCategoriesController extends ModuleAdminController
         if (empty($cols)) {
             $db->execute('ALTER TABLE `' . $prefix . 'smartcategory_rules` ADD COLUMN `discount_value` DECIMAL(20,6) NOT NULL DEFAULT 0');
             $this->scLog('scEnsureColumns: discount_value column created');
+        }
+
+        $cols = $db->executeS('SHOW COLUMNS FROM `' . $prefix . 'smartcategory_rules` LIKE \'include_inactive\'');
+        if (empty($cols)) {
+            $db->execute('ALTER TABLE `' . $prefix . 'smartcategory_rules` ADD COLUMN `include_inactive` TINYINT(1) NOT NULL DEFAULT 0');
+            $this->scLog('scEnsureColumns: include_inactive column created');
         }
 
         // Comprobar si tabla de precios especificos existe

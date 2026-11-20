@@ -28,6 +28,7 @@ class SmartCategoryRule extends ObjectModel
     public $discount_enabled = 0;
     public $discount_type = 'percentage';
     public $discount_value = 0;
+    public $include_inactive = 0;
     public $date_add;
     public $date_upd;
 
@@ -53,6 +54,7 @@ class SmartCategoryRule extends ObjectModel
             'discount_enabled'  => ['type' => self::TYPE_BOOL, 'validate' => 'isBool'],
             'discount_type'     => ['type' => self::TYPE_STRING, 'size' => 20],
             'discount_value'    => ['type' => self::TYPE_FLOAT, 'validate' => 'isFloat'],
+            'include_inactive'  => ['type' => self::TYPE_BOOL, 'validate' => 'isBool'],
             'date_add'    => ['type' => self::TYPE_DATE],
             'date_upd'    => ['type' => self::TYPE_DATE],
         ],
@@ -87,6 +89,7 @@ class SmartCategoryRule extends ObjectModel
                 $rule->discount_enabled = isset($row['discount_enabled']) ? (int) $row['discount_enabled'] : 0;
                 $rule->discount_type    = isset($row['discount_type'])    ? $row['discount_type']    : 'percentage';
                 $rule->discount_value   = isset($row['discount_value'])   ? (float) $row['discount_value']   : 0;
+                $rule->include_inactive = isset($row['include_inactive']) ? (int) $row['include_inactive'] : 0;
                 $rules[] = $rule;
             }
         }
@@ -379,7 +382,8 @@ class SmartCategoryRule extends ObjectModel
         $idShop = (int) Context::getContext()->shop->id;
 
         $joins['ps_base'] = 'INNER JOIN `' . _DB_PREFIX_ . 'product_shop` ps_base ON (ps_base.id_product = p.id_product AND ps_base.id_shop = ' . $idShop . ')';
-        $baseWheres = ['ps_base.active = 1'];
+        // include_inactive: productos desactivados en la web (ej. solo venta en TPV) también reciben la regla
+        $baseWheres = (int) $this->include_inactive ? [] : ['ps_base.active = 1'];
 
         foreach ($conditions as $condition) {
             switch ($condition['condition_type']) {

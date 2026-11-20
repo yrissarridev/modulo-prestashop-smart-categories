@@ -1,4 +1,4 @@
 {
-  "version": "1.3.0",
-  "changelog": "Nueva funcionalidad: descuentos reales (precio especifico) por regla, aplicables a nivel de combinacion exacta (ej: solo el color Cubano, no todo el producto). Incluye leyenda dinamica junto al precio que reacciona a la variante seleccionada por el comprador, y limpieza automatica del descuento cuando el producto/variante deja de cumplir la regla."
+  "version": "1.4.0",
+  "changelog": "Nueva opcion por regla: Incluir productos desactivados. Permite que productos desactivados en la web (por ejemplo, vendidos solo en el TPV de tienda fisica) reciban la categoria y el descuento de la regla. Apagada por defecto."
 }

@@ -2,7 +2,7 @@
 /**
  * SmartCategories - Módulo de categorización automática para PrestaShop
  * @author Luis de Yrissarri
- * @version 1.2.2
+ * @version 1.4.0
  * Compatible con PrestaShop 1.7.5 - 9.x
  */
 
@@ -19,7 +19,7 @@ class SmartCategories extends Module
     {
         $this->name = 'smartcategories';
         $this->tab = 'administration';
-        $this->version = '1.3.0';
+        $this->version = '1.4.0';
         $this->author = 'Luis de Yrissarri';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = [
@@ -180,6 +180,7 @@ class SmartCategories extends Module
         $this->ensureColumnExists('smartcategory_rules', 'discount_enabled', "TINYINT(1) NOT NULL DEFAULT 0");
         $this->ensureColumnExists('smartcategory_rules', 'discount_type', "ENUM('amount','percentage') NOT NULL DEFAULT 'percentage'");
         $this->ensureColumnExists('smartcategory_rules', 'discount_value', "DECIMAL(20,6) NOT NULL DEFAULT 0");
+        $this->ensureColumnExists('smartcategory_rules', 'include_inactive', "TINYINT(1) NOT NULL DEFAULT 0");
         $this->scEnsureSpecificPricesTable();
 
         return true;
