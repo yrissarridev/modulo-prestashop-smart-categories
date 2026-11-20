@@ -860,6 +860,10 @@ class SmartCategoryRule extends ObjectModel
      */
     private function applyCategoryIndexation()
     {
+        // category.indexation solo existe en algunas versiones de PrestaShop
+        if (!Db::getInstance()->executeS('SHOW COLUMNS FROM `' . _DB_PREFIX_ . 'category` LIKE \'indexation\'')) {
+            return;
+        }
         $indexation = $this->noindex ? 0 : 1;
         Db::getInstance()->update(
             'category',
