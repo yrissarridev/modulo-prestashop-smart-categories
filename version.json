@@ -1,4 +1,4 @@
 {
-  "version": "1.4.1",
-  "changelog": "La opcion por regla 'Incluir productos desactivados' pasa a estar ACTIVADA por defecto (reglas nuevas y columna nueva), porque los productos desactivados en la web se venden en el TPV de tienda fisica. Se puede desmarcar en cada regla."
+  "version": "1.4.2",
+  "changelog": "Fix: una regla con include_inactive activo y sin otra condicion que la de categorias generaba un WHERE vacio y la regla se vaciaba. Ademas 'Incluir productos desactivados' queda ACTIVADA por defecto (TPV de tienda fisica)."
 }

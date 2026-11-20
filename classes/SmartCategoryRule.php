@@ -544,7 +544,7 @@ class SmartCategoryRule extends ObjectModel
         $sql = 'SELECT DISTINCT p.id_product FROM `' . _DB_PREFIX_ . 'product` p ';
         $sql .= implode(' ', $joins);
         $allWheres = array_merge($baseWheres, $conditionWheres);
-        $sql .= ' WHERE ' . implode(' AND ', $allWheres);
+        $sql .= ' WHERE ' . ($allWheres ? implode(' AND ', $allWheres) : '1=1');
 
         $rows = Db::getInstance()->executeS($sql);
         if (!$rows) {
