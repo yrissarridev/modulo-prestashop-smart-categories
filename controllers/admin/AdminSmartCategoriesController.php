@@ -850,10 +850,6 @@ class AdminSmartCategoriesController extends ModuleAdminController
             'ALTER TABLE `' . _DB_PREFIX_ . 'smartcategory_conditions`
              MODIFY `value` TEXT NOT NULL,
              MODIFY `value2` TEXT DEFAULT NULL',
-            'ALTER TABLE `' . _DB_PREFIX_ . 'smartcategory_rules`
-             ADD COLUMN IF NOT EXISTS `noindex` TINYINT(1) NOT NULL DEFAULT 0',
-            'ALTER TABLE `' . _DB_PREFIX_ . 'smartcategory_rules`
-             ADD COLUMN IF NOT EXISTS `flag_text` VARCHAR(100) DEFAULT \'\'',
             'CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . 'smartcategory_badges` (
                 `id_product` INT(10) UNSIGNED NOT NULL,
                 `id_rule` INT(10) UNSIGNED NOT NULL,

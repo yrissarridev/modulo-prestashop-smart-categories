@@ -1,4 +1,4 @@
 {
-  "version": "1.4.3",
-  "changelog": "Fix: una regla con include_inactive activo y sin otra condicion que la de categorias generaba un WHERE vacio y la regla se vaciaba. Ademas 'Incluir productos desactivados' queda ACTIVADA por defecto (TPV de tienda fisica)."
+  "version": "1.4.4",
+  "changelog": "Fix: instalacion en MySQL 8 (ADD COLUMN IF NOT EXISTS es solo de MariaDB); las columnas se crean con ensureColumnExists()."
 }

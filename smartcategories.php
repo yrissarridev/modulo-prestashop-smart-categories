@@ -2,7 +2,7 @@
 /**
  * SmartCategories - Módulo de categorización automática para PrestaShop
  * @author Luis de Yrissarri
- * @version 1.4.3
+ * @version 1.4.4
  * Compatible con PrestaShop 1.7.5 - 9.x
  */
 
@@ -19,7 +19,7 @@ class SmartCategories extends Module
     {
         $this->name = 'smartcategories';
         $this->tab = 'administration';
-        $this->version = '1.4.3';
+        $this->version = '1.4.4';
         $this->author = 'Luis de Yrissarri';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = [
@@ -123,46 +123,18 @@ class SmartCategories extends Module
             }
         }
 
-        // Migraciones para instalaciones previas (errores ignorados si ya están aplicadas)
+        // Migraciones para instalaciones previas
         $migrations = [
             'ALTER TABLE `' . _DB_PREFIX_ . 'smartcategory_conditions`
              MODIFY `value` TEXT NOT NULL,
              MODIFY `value2` TEXT DEFAULT NULL',
-            'ALTER TABLE `' . _DB_PREFIX_ . 'smartcategory_rules`
-             ADD COLUMN IF NOT EXISTS `start_date` DATETIME DEFAULT NULL',
-            'ALTER TABLE `' . _DB_PREFIX_ . 'smartcategory_rules`
-             ADD COLUMN IF NOT EXISTS `end_date` DATETIME DEFAULT NULL',
-            'ALTER TABLE `' . _DB_PREFIX_ . 'smartcategory_rules`
-             ADD COLUMN IF NOT EXISTS `noindex` TINYINT(1) NOT NULL DEFAULT 0',
-            'ALTER TABLE `' . _DB_PREFIX_ . 'smartcategory_rules`
-             ADD COLUMN IF NOT EXISTS `flag_text` VARCHAR(100) DEFAULT \'\'',
-            'ALTER TABLE `' . _DB_PREFIX_ . 'smartcategory_rules`
-             ADD COLUMN IF NOT EXISTS `flag_bg` VARCHAR(7) DEFAULT \'#e84444\'',
-            'ALTER TABLE `' . _DB_PREFIX_ . 'smartcategory_rules`
-             ADD COLUMN IF NOT EXISTS `flag_color` VARCHAR(7) DEFAULT \'#ffffff\'',
-            'ALTER TABLE `' . _DB_PREFIX_ . 'smartcategory_rules`
-             ADD COLUMN IF NOT EXISTS `listing_sel_type` VARCHAR(10) DEFAULT \'class\'',
-            'ALTER TABLE `' . _DB_PREFIX_ . 'smartcategory_rules`
-             ADD COLUMN IF NOT EXISTS `listing_sel_value` VARCHAR(255) DEFAULT \'product-price-and-shipping\'',
-            'ALTER TABLE `' . _DB_PREFIX_ . 'smartcategory_rules`
-             ADD COLUMN IF NOT EXISTS `listing_position` VARCHAR(10) DEFAULT \'prepend\'',
-            'ALTER TABLE `' . _DB_PREFIX_ . 'smartcategory_rules`
-             ADD COLUMN IF NOT EXISTS `product_sel_type` VARCHAR(10) DEFAULT \'class\'',
-            'ALTER TABLE `' . _DB_PREFIX_ . 'smartcategory_rules`
-             ADD COLUMN IF NOT EXISTS `product_sel_value` VARCHAR(255) DEFAULT \'product-prices\'',
-            'ALTER TABLE `' . _DB_PREFIX_ . 'smartcategory_rules`
-             ADD COLUMN IF NOT EXISTS `product_position` VARCHAR(10) DEFAULT \'prepend\'',
-            'ALTER TABLE `' . _DB_PREFIX_ . 'smartcategory_badges`
-             ADD COLUMN IF NOT EXISTS `badge_bg` VARCHAR(7) NOT NULL DEFAULT \'#e84444\'',
-            'ALTER TABLE `' . _DB_PREFIX_ . 'smartcategory_badges`
-             ADD COLUMN IF NOT EXISTS `badge_color` VARCHAR(7) NOT NULL DEFAULT \'#ffffff\'',
         ];
 
         foreach ($migrations as $mig) {
             Db::getInstance()->execute($mig);
         }
 
-        // Fallback seguro para motores que no soportan ADD COLUMN IF NOT EXISTS
+        // Columnas añadidas por versiones posteriores (compatible MySQL y MariaDB)
         $this->ensureColumnExists('smartcategory_rules', 'start_date', 'DATETIME DEFAULT NULL');
         $this->ensureColumnExists('smartcategory_rules', 'end_date', 'DATETIME DEFAULT NULL');
         $this->ensureColumnExists('smartcategory_rules', 'noindex', 'TINYINT(1) NOT NULL DEFAULT 0');
