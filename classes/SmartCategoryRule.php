@@ -356,7 +356,7 @@ class SmartCategoryRule extends ObjectModel
             // Gestionar precios especificos (descuentos por combinacion exacta) si estan activados.
             if ((int) $this->discount_enabled) {
                 $pairs = $this->getMatchingProductAttributePairs($conditions);
-                $this->syncSpecificPrices($pairs);
+                $failedPrices = $this->syncSpecificPrices($pairs);
             } else {
                 $this->syncSpecificPrices([]);
             }
@@ -365,6 +365,9 @@ class SmartCategoryRule extends ObjectModel
             $this->applyCategoryIndexation();
 
             $executionTime = microtime(true) - $startTime;
+            if (!empty($failedPrices)) {
+                return $this->logResult($added, $removed, $executionTime, 'error', $failedPrices . ' precio(s) especifico(s) no se pudieron crear; se reintentaran en la siguiente ejecucion.');
+            }
             return $this->logResult($added, $removed, $executionTime, 'success', null);
         } catch (Exception $e) {
             $executionTime = microtime(true) - $startTime;
@@ -761,12 +764,13 @@ class SmartCategoryRule extends ObjectModel
             }
         }
 
+        $failed = 0;
         foreach ($wantedMap as $key => $p) {
             if (isset($trackedMap[$key])) {
                 continue; // ya existe, no duplicar el precio (la leyenda ya se actualizo arriba)
             }
 
-            $db->insert('specific_price', [
+            $okInsert = $db->insert('specific_price', [
                 'id_specific_price_rule' => 0,
                 'id_cart'       => 0,
                 'id_product'    => (int) $p['id_product'],
@@ -785,7 +789,12 @@ class SmartCategoryRule extends ObjectModel
                 'from' => '0000-00-00 00:00:00',
                 'to'   => '0000-00-00 00:00:00',
             ]);
-            $newId = (int) $db->Insert_ID();
+            $newId = $okInsert ? (int) $db->Insert_ID() : 0;
+            if ($newId <= 0) {
+                // p. ej. choca con la clave unica de otra regla aun no limpiada: sin fila de seguimiento, se reintenta en el siguiente cron
+                $failed++;
+                continue;
+            }
 
             $db->insert('smartcategory_specific_prices', [
                 'id_rule' => $idRule,
@@ -796,6 +805,8 @@ class SmartCategoryRule extends ObjectModel
                 'date_add' => date('Y-m-d H:i:s'),
             ]);
         }
+
+        return $failed;
     }
 
     /**
@@ -862,12 +873,6 @@ class SmartCategoryRule extends ObjectModel
         $active = (int) (bool) $active;
         Db::getInstance()->update(
             'category',
-            ['active' => $active],
-            'id_category = ' . (int) $this->id_category
-        );
-
-        Db::getInstance()->update(
-            'category_shop',
             ['active' => $active],
             'id_category = ' . (int) $this->id_category
         );
